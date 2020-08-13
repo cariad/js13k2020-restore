@@ -13,7 +13,6 @@ var inject = require('gulp-inject');
 
 function clean(cb) {
   rimraf.sync('build');
-  rimraf.sync('dist');
   cb();
 }
 
@@ -67,17 +66,17 @@ function bundle() {
       removeAttributeQuotes: true,
       removeComments: true,
     }))
-    .pipe(gulp.dest('dist'));
+    .pipe(gulp.dest('.'));
 }
 
 
 
 function pack() {
-  return gulp.src('dist/index.html')
-    .pipe(zip('x.zip'))
+  return gulp.src('index.html')
+    .pipe(zip('remote.zip'))
     .pipe(size())
     .pipe(micro({ limit: 13 * 1024 }))
-    .pipe(gulp.dest('dist'));
+    .pipe(gulp.dest('.'));
 }
 
 function serve() {
