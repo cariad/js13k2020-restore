@@ -1,8 +1,19 @@
+// The primary client's data is a little more valuable than the usual.
+var PRIMARY_VALUE_MULTIPLIER = 2;
+
+// The size of the pool of files that sailors could be carrying.
+var MAX_OTHER_FILES_IN_PLAY = 8;
+
+var CHUNKS_PER_FILE = 8;
+
+// We use this a lot, so let's not repeat the whole thing every time.
+var f = Math.floor;
+
+
 var canvas = document.getElementById("c");
 var ctx = canvas.getContext("2d");
 
-
-buttons = [];
+var buttons = [];
 
 var onClick = (e) => {
   var x = e.offsetX, y = e.offsetY;
@@ -20,27 +31,18 @@ var makeButton = (x, y, w, h, t) => {
   console.info('buttons', buttons);
 };
 
-var f = Math.floor;
-
-
 // Thank you, David Braben!
+// TODO: Randomise these seeds.
 var SEED_LEFT = 4;
 var SEED_RIGHT = 7;
-// `m` should be +1 over the maximum you want.
 var nextRandom = (m = 10) => {
-  var d = (SEED_LEFT + SEED_RIGHT) / 10;
-  var r = f((d - f(d)) * 10);
+  var d = (SEED_LEFT + SEED_RIGHT) / 10, r = f((d - f(d)) * 10);
   SEED_LEFT = SEED_RIGHT;
   SEED_RIGHT = r;
   return r % m;
 }
 
-
-
-
 var nextRandomBool = () => nextRandom() < 5;
-
-var CHUNKS_PER_FILE = 8;
 
 var makePartial = () => {
   var p = 0, PART_LENGTH = 2;
@@ -51,9 +53,8 @@ var makePartial = () => {
   return p;
 }
 
-
 var showSailor = (s) => {
-  for (var i=0; i<s.h.length; i++) {
+  for (var i = 0; i < s.h.length; i++) {
     showHolding(s.h[i]);
   }
 };
@@ -61,46 +62,24 @@ var showSailor = (s) => {
 var showBits = (p) => console.info(`(${p.toString().padStart(3, ' ')}) ${p.toString(2).padStart(CHUNKS_PER_FILE, 0)}`);
 var showHolding = (h) => console.info(`(fileid=${h.i.toString().padStart(2, '0')}) ${h.b.toString(2).padStart(CHUNKS_PER_FILE, 0)}`);
 
-// var owned;
-
 var newGame = () => {
   var me = makeSailor(true, 0);
   console.info('Me:');
   showSailor(me);
-  // showBits(me.h[0].b);
 
   var sailor = makeSailor(true, 3);
   console.info('Theirs:');
   showSailor(sailor);
 
-  generateOffer(sailor.h[0], me.h[0]);
+  generateOffer(sailor, me);
 };
 
-// The primary client's data is a little more valuable than the usual.
-var PRIMARY_VALUE_MULTIPLIER = 2;
-
-var MAX_OTHER_FILES_IN_PLAY = 8;
-
 var makeShuffled = (max, length) => {
-  // max = maximum value (exclusive)
-  // len = actual quantity to return.
-  // e.g. makeShuffled(10, 3) == [7, 3, 9]
-  var s = [];
-  for(var i = 0; i<max; i++) {
-    s.push(i);
-  }
-  console.info('ordered sequence', s);
-
-  r = [];
-  for(var i =0; i<length; i++) {
-    // REMEMBER: Passing > 10 into nextRandom() makes no sense.
-    r.push(s.splice(nextRandom(s.length),1)[0]);
-  }
-
-  console.info('randomised sequence', r);
+  var s = [], r = [];
+  for (var i = 0; i < max; i++) s.push(i);
+  for (var i = 0; i < length; i++) r.push(s.splice(nextRandom(s.length), 1)[0]);
   return r
 }
-
 
 var makeSailor = (hasPrimary, otherCount) => {
   // h: holding
@@ -111,8 +90,8 @@ var makeSailor = (hasPrimary, otherCount) => {
     // hunting for.
     sailor.h.push(
       {
-        // v: value of this holding
-        v: PRIMARY_VALUE_MULTIPLIER,
+        // m: value multiplier
+        m: PRIMARY_VALUE_MULTIPLIER,
         // b: bits of this holding
         b: makePartial(),
         // i: file id, 0 is the primary file
@@ -123,10 +102,10 @@ var makeSailor = (hasPrimary, otherCount) => {
   makeShuffled(MAX_OTHER_FILES_IN_PLAY, otherCount).forEach(i => sailor.h.push(
     {
       // TODO: Randomise the value.
-      v: 1,
+      m: 1,
       b: makePartial(),
       // Don't allow 0, that's special.
-      i: i+1,
+      i: i + 1,
     })
   );
 
@@ -143,16 +122,47 @@ var countSetBits = (p) => {
   return count;
 }
 
+// Returns the value of an offer ("01000010") given its multiplier (2),
+var calcValue = (offer, multiplier) => countSetBits(offer) * multiplier;
+
+var findCommonFiles = (sailorX, sailorY) => {
+  console.info('Finding common holdings...');
+  var common = [];
+  sailorX.h.forEach(holdingX => {
+    var foundHolding = sailorY.h.find(holdingY => {
+      return holdingX.i == holdingY.i;
+    });
+
+    if (foundHolding) {
+      common.push(foundHolding.i)
+    }
+  });
+
+  console.info('Common holdings:', common);
+  return common;
+}
+
+var findHighestValueOffer = (fromSailor, toSailor) => {
+  // Maximise value for `toSailor`.
+  commonFiles = findCommonFiles(fromSailor, toSailor);
+  return null;
+}
+
+
 var generateOffer = (save, scam) => {
   // var currSailorValue = countSetBits(save.b) * save.v;
   // console.info(`The sailor's data is currently worth $${currSailorValue}.`)
   console.info('The sailor says, "I want..."');
-  var want = (save.b ^ scam.b) & scam.b;
-  showBits(want);
-  takeCount = countSetBits(want);
-  // console.info(`This transaction is worth $${set} to the sailor.`)
+  var offer = findHighestValueOffer(save, scam);
 
-  console.info(`The sailor wants to take ${takeCount} parts.`);
+  // var want = (save.b ^ scam.b) & scam.b;
+  // showBits(want);
+  // var takeValue = calcValue(want, save.m);
+  // console.info(`This transaction is worth $${takeValue}.`)
+
+  // // The sailor will offer 80% value in return.
+  // var returnValue = f(takeValue * 0.8);
+  // console.info(`The sailor will offer $${returnValue} in return.`);
 
   // The sailor will offer the same VALUE in return, but not necessarily for
   // the same file. They might offer some parts of a lower-value file.
@@ -161,9 +171,8 @@ var generateOffer = (save, scam) => {
   // receive from the trade is 2x the value you will receive from your
   // completed file.
 
-  var returnCount = f(takeCount * 0.8);
 
-  console.info(`The sailor says, "I will offer you ${returnCount} parts in return:"`);
+  // console.info(`The sailor says, "I will offer you ${returnCount} parts in return:"`);
 
 
   // If we need 1 chunk then the sailor will offer it. The sailor code demands honor. And maybe he can continue selling the data to folks who don't know it's complete. Hah, maybe you're not even the first.
