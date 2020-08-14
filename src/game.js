@@ -42,16 +42,10 @@ var nextRandom = (m = 10) => {
   return r % m;
 }
 
-var nextRandomBool = () => nextRandom() < 5;
-
-var makePartial = () => {
-  var p = 0, PART_LENGTH = 2;
-  for (var i = CHUNKS_PER_FILE / PART_LENGTH; i > 0; i--) {
-    p = p + nextRandom(4); // 0, 1, 2 or 3
-    if (i > 1) p = p << PART_LENGTH;
-  }
-  return p;
-}
+var makePartial = () => [2, 2, 2, 0].reduce((acc, shift) => {
+    acc += nextRandom(4);
+    return acc <<= shift;
+  }, 0);
 
 var showSailor = (sailor) => {
   console.info(`Sailor: ${sailor.n}`);
@@ -63,14 +57,17 @@ var toBinary = (b) => b.toString(2).padStart(CHUNKS_PER_FILE, 0);
 var showBits = (p) => console.info(`(${p.toString().padStart(3, ' ')}) ${toBinary(p)}`);
 var showHolding = (h) => console.info(`(fileid=${h.i.toString().padStart(2, '0')}) ${toBinary(h.b)}`);
 
+var player;
+var opponent;
+
 var newGame = () => {
-  var me = makeSailor(true, 0, 'Bob');
-  showSailor(me);
+  player = makeSailor(true, 0, 'Bob');
+  showSailor(player);
 
-  var sailor = makeSailor(true, 3, 'Weirdbeard');
-  showSailor(sailor);
+  opponent = makeSailor(true, 3, 'Weirdbeard');
+  showSailor(opponent);
 
-  generateOffer(sailor, me);
+  generateOffer();
 };
 
 var makeShuffled = (max, length) => {
@@ -111,7 +108,7 @@ var makeSailor = (hasPrimary, otherCount, name) => {
   return sailor;
 };
 
-var countSetBits = (p) => {
+var countSetBits = p => {
   var count = 0;
   while (p > 0) {
     p &= (p - 1);
@@ -128,24 +125,123 @@ var findCommonFiles = (sx, sy) => sx.f.map(f => f.i).filter(v => sy.f.map(f => f
 
 var getSailorFile = (sailor, id) => sailor.f.find(f => f.i == id);
 
-var findHighestValueOffer = (fromSailor, toSailor) => {
+var findHighValueTransction = (fromSailor, toSailor) => {
   // Maximise value for `toSailor`.
+  var highestValueTransaction = {v:0};
+
   findCommonFiles(fromSailor, toSailor).forEach(id => {
     var fromFile = getSailorFile(fromSailor, id);
     var toFile = getSailorFile(toSailor, id);
     var offer = (toFile.b ^ fromFile.b) & fromFile.b;
     var value = calcValue(offer, fromFile.m);
-    console.info(`A transfer of ${toBinary(offer)} would be worth ${value}.`);
-  })
-  return null;
+    // console.debug(`A transfer of ${toBinary(offer)} for file ${id} would be worth $${value}.`);
+    if (value > highestValueTransaction.v) {
+      highestValueTransaction.id = id;
+      highestValueTransaction.b = offer;
+      highestValueTransaction.v = value;
+    }
+  });
+
+  return highestValueTransaction;
 }
 
+// var MAX_FILE_VALUE = 255;
 
-var generateOffer = (save, scam) => {
+
+var findFullTransaction = (fromSailor, toSailor, id) => {
+  var r = {i: id};
+  var fromFile = getSailorFile(fromSailor, id);
+  var toFile = getSailorFile(toSailor, id);
+  r.b = ((toFile ? toFile.b : 0) ^ fromFile.b) & fromFile.b;
+  r.v = calcValue(r.b, fromFile.m);
+  // console.debug(`${fromSailor.n} could copy $${r.v} of chunks of file ${id} to ${toSailor.n}.`);
+  return r;
+}
+
+var showTransaction = t => console.debug(`[transaction] "${toBinary(t.b)}" of file (${t.i}) worth $${t.v}.`);
+
+
+var findLowValueTransaction = (fromSailor, toSailor, matchValue) => {
+  // Minimise value for `toSailor`.
+  var transactions = [];
+  // var total = 0;
+
+  // console.debug(`Looking for chunks worth $${matchValue} to copy from ${fromSailor.n} -> ${toSailor.n}.`);
+
+  // var lowestOffer = {v: 99}; // Assume max multipler of 3, 3*8 bits = 24, may as go for 99 if we need double digits anyway
+
+  // Don't just look in the common files; `fromnSailor` might decide to offer `toSailor` a new file.
+
+  // Get a sorted (lowest to highest value) list of possible transactions.
+
+  transactions = fromSailor.f.map(file => findFullTransaction(fromSailor, toSailor, file.i));
+  transactions.sort((x,y) => x.v > y.v);
+
+  console.debug('Transactions to consider (in order):');
+  transactions.forEach(t => showTransaction(t));
+
+  console.info(`${fromSailor.n} started thinking about the lowest-value chunks to offer for $${matchValue}...`)
+
+  var transactionsToOffer = [];
+  var transactionsToOfferTotal = 0;
+
+  transactions.forEach(t => {
+    var over = t.v + transactionsToOfferTotal - matchValue;
+
+    // console.debug(`${fromSailor.n} could offer chunks of file ${id} worth $${value}...`);
+
+    if (over <= 0) {
+      transactionsToOffer.push(t);
+      transactionsToOfferTotal += t.v;
+      console.debug('Will offer in entirety:');
+      showTransaction(t);
+    } else {
+      console.debug('Will offer in part:');
+      showTransaction(t);
+      // console.info('The sailor cannot give you all of these because the value is too high.');
+      // var remove = f(over/fromFile.m);
+      // console.info(`The sailor must remove ${remove} chunks.`);
+    }
+
+
+
+  });
+
+
+      // var fromFile = getSailorFile(fromSailor, id);
+    // var toFile = getSailorFile(toSailor, id);
+    // var offer = (toFile.b ^ fromFile.b) & fromFile.b;
+    // var value = calcValue(offer, fromFile.m);
+
+
+
+
+    // console.debug(`A transfer of ${toBinary(offer)} for file ${id} would be worth $${value}.`);
+    // if (value > highestOffer.v) {
+    //   highestOffer.i = id;
+    //   highestOffer.b = offer;
+    //   highestOffer.v = value;
+    // }
+
+
+  return null;
+};
+
+
+// var showOffer = offer => console.debug(`An offer to copy file ${offer.i} chunks "${toBinary(offer.b)}" from ${offer.f.n} to ${offer.t.n}.`);
+
+// var global_current_offer;
+
+var generateOffer = () => {
   // var currSailorValue = countSetBits(save.b) * save.v;
   // console.info(`The sailor's data is currently worth $${currSailorValue}.`)
-  console.info('The sailor says, "I want..."');
-  var offer = findHighestValueOffer(scam, save);
+  console.info(`${opponent.n} thinks for a moment before making an offer.`);
+
+  var highTransaction = findHighValueTransction(player, opponent);
+  // showTransaction(highTransaction);
+
+  var lowTransaction = findLowValueTransaction(opponent, player, highTransaction.v);
+  // if (lowTransaction) showTransaction(lowTransaction);
 
   // var want = (save.b ^ scam.b) & scam.b;
   // showBits(want);
@@ -171,13 +267,6 @@ var generateOffer = (save, scam) => {
 
 }
 
-/*
-
-states:
-
-1. offer to trade
-
-*/
 
 
 
