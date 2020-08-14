@@ -6,8 +6,6 @@ var size = require('gulp-size');
 var zip = require('gulp-zip');
 var rimraf = require('rimraf');
 var cssmin = require('gulp-cssmin');
-var express = require('express');
-const chalk = require('chalk');
 const terser = require('gulp-terser');
 var inject = require('gulp-inject');
 
@@ -38,13 +36,18 @@ function minifyCss() {
 function minifyJs() {
   return gulp.src(`src/game.js`)
     .pipe(terser({
-      "mangle": { "toplevel": true }
+      toplevel: true,
+      compress: {
+        passes: 100,
+        unsafe: true,
+        pure_getters: true
+      },
+      mangle: { toplevel: true }
     }))
     .pipe(gulp.dest(`build`));
 }
 
 function readFile(filename, file) {
-  console.log(chalk.yellow(`Reading ${filename}...`))
   return file.contents.toString('utf8');
 }
 
@@ -79,16 +82,6 @@ function pack() {
     .pipe(gulp.dest('.'));
 }
 
-function serve() {
-  var app = express();
-
-  app.use(express.static('build'));
-  app.listen(3000, function () {
-    console.info("Server started on '" + chalk.green('http://localhost:3000') + "'");
-  });
-}
-
-
 function watch() {
   gulp.watch('src/*.*', build);
 }
@@ -105,4 +98,3 @@ const build = series(
 
 exports.default = series(build, watch);
 exports.build = build;
-exports.serve = series(build, serve);
