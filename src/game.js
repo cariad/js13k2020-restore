@@ -53,22 +53,21 @@ var makePartial = () => {
   return p;
 }
 
-var showSailor = (s) => {
-  for (var i = 0; i < s.h.length; i++) {
-    showHolding(s.h[i]);
-  }
+var showSailor = (sailor) => {
+  console.info(`Sailor: ${sailor.n}`);
+  sailor.f.forEach(file => showHolding(file));
 };
 
-var showBits = (p) => console.info(`(${p.toString().padStart(3, ' ')}) ${p.toString(2).padStart(CHUNKS_PER_FILE, 0)}`);
-var showHolding = (h) => console.info(`(fileid=${h.i.toString().padStart(2, '0')}) ${h.b.toString(2).padStart(CHUNKS_PER_FILE, 0)}`);
+var toBinary = (b) => b.toString(2).padStart(CHUNKS_PER_FILE, 0);
+
+var showBits = (p) => console.info(`(${p.toString().padStart(3, ' ')}) ${toBinary(p)}`);
+var showHolding = (h) => console.info(`(fileid=${h.i.toString().padStart(2, '0')}) ${toBinary(h.b)}`);
 
 var newGame = () => {
-  var me = makeSailor(true, 0);
-  console.info('Me:');
+  var me = makeSailor(true, 0, 'Bob');
   showSailor(me);
 
-  var sailor = makeSailor(true, 3);
-  console.info('Theirs:');
+  var sailor = makeSailor(true, 3, 'Weirdbeard');
   showSailor(sailor);
 
   generateOffer(sailor, me);
@@ -81,14 +80,14 @@ var makeShuffled = (max, length) => {
   return r
 }
 
-var makeSailor = (hasPrimary, otherCount) => {
-  // h: holding
-  var sailor = { h: [] };
+var makeSailor = (hasPrimary, otherCount, name) => {
+  // f: files
+  var sailor = { f: [], n: name };
 
   if (hasPrimary) {
     // The first item in the array is always for the primary client we're
     // hunting for.
-    sailor.h.push(
+    sailor.f.push(
       {
         // m: value multiplier
         m: PRIMARY_VALUE_MULTIPLIER,
@@ -99,7 +98,7 @@ var makeSailor = (hasPrimary, otherCount) => {
       });
   }
 
-  makeShuffled(MAX_OTHER_FILES_IN_PLAY, otherCount).forEach(i => sailor.h.push(
+  makeShuffled(MAX_OTHER_FILES_IN_PLAY, otherCount).forEach(i => sailor.f.push(
     {
       // TODO: Randomise the value.
       m: 1,
@@ -111,7 +110,6 @@ var makeSailor = (hasPrimary, otherCount) => {
 
   return sailor;
 };
-
 
 var countSetBits = (p) => {
   var count = 0;
@@ -125,26 +123,20 @@ var countSetBits = (p) => {
 // Returns the value of an offer ("01000010") given its multiplier (2),
 var calcValue = (offer, multiplier) => countSetBits(offer) * multiplier;
 
-var findCommonFiles = (sailorX, sailorY) => {
-  console.info('Finding common holdings...');
-  var common = [];
-  sailorX.h.forEach(holdingX => {
-    var foundHolding = sailorY.h.find(holdingY => {
-      return holdingX.i == holdingY.i;
-    });
+// Sailor X, Sailor Y
+var findCommonFiles = (sx, sy) => sx.f.map(f => f.i).filter(v => sy.f.map(f => f.i).includes(v));
 
-    if (foundHolding) {
-      common.push(foundHolding.i)
-    }
-  });
-
-  console.info('Common holdings:', common);
-  return common;
-}
+var getSailorFile = (sailor, id) => sailor.f.find(f => f.i == id);
 
 var findHighestValueOffer = (fromSailor, toSailor) => {
   // Maximise value for `toSailor`.
-  commonFiles = findCommonFiles(fromSailor, toSailor);
+  findCommonFiles(fromSailor, toSailor).forEach(id => {
+    var fromFile = getSailorFile(fromSailor, id);
+    var toFile = getSailorFile(toSailor, id);
+    var offer = (toFile.b ^ fromFile.b) & fromFile.b;
+    var value = calcValue(offer, fromFile.m);
+    console.info(`A transfer of ${toBinary(offer)} would be worth ${value}.`);
+  })
   return null;
 }
 
@@ -153,7 +145,7 @@ var generateOffer = (save, scam) => {
   // var currSailorValue = countSetBits(save.b) * save.v;
   // console.info(`The sailor's data is currently worth $${currSailorValue}.`)
   console.info('The sailor says, "I want..."');
-  var offer = findHighestValueOffer(save, scam);
+  var offer = findHighestValueOffer(scam, save);
 
   // var want = (save.b ^ scam.b) & scam.b;
   // showBits(want);
