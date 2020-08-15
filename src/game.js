@@ -39,7 +39,7 @@ var makeName = _ => {
 var draw = () => {
   var w = canvas.width = window.innerWidth;
   var h = canvas.height = window.innerHeight;
-
+  var margin = 20;
 
   // var w = canvas.width, h = canvas.height;
 
@@ -53,25 +53,30 @@ var draw = () => {
   ctx.textBaseline = "top";
   ctx.fillText(`${w} x ${h}`, 0, 0);
 
-
   if (opponent) {
-    drawOpponent(50, 100);
-    drawOpponent(300, 100);
-    drawOpponent(550, 100);
-
-    drawOpponent(50, 350);
-    drawOpponent(300, 350);
-    drawOpponent(550, 350);
-
-    drawOpponent(50, 600);
-    drawOpponent(300, 600);
-    drawOpponent(550, 600);
+    var hw = f(w / 2)
+    var maxWidth = hw - margin;
+    var maxHeight = h - (margin * 2);
+    var dim = (maxWidth > maxHeight) ? maxHeight : maxWidth;
+    var oppX = (w * 0.75) - (dim / 2);
+    var oppY = (h / 2) - (dim / 2);
+    drawOpponent(oppX, oppY, dim);
   }
 
   if (global_current_offer) {
-    makeButton(50, 50, 100, 50, "Accept");
-    makeButton(200, 50, 100, 50, "Counter");
+    makeButton(50, 50, 100, 50, 'Accept');
+    makeButton(200, 50, 100, 50, 'Counter');
   }
+
+  ctx.font = 'bold 22px cursive';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = '#000';
+  fe(buttons, b => {
+    ctx.fillText(b.t, b.x + (b.w / 2), b.y + (b.h / 2), b.w, b.h);
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+  });
+
 };
 
 window.addEventListener('resize', draw, true);
@@ -88,10 +93,12 @@ var fi = (a, f) => a.find(f);
 
 // c: color [r, g, b]
 // d: +/- for tones
-var drawObject = (g, x, y, c, d) => {
+var drawObject = (g, x, y, c, d, w) => {
   var offcanvas = document.createElement('canvas');
   var offctx = offcanvas.getContext("2d");
-  var offWidth = offcanvas.width = 32, offHeight = offcanvas.height = 36;
+  var offWidth = offcanvas.width = 31, offHeight = offcanvas.height = 31;
+
+  offctx.lineWidth = 1;
 
   g(offctx);
 
@@ -124,234 +131,117 @@ var drawObject = (g, x, y, c, d) => {
   offctx.putImageData(image, 0, 0);
 
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(offcanvas, x, y, offWidth * 10, offHeight * 10);
+  ctx.drawImage(offcanvas, x, y, w, (w / offWidth) * offHeight);
   ctx.imageSmoothingEnabled = true;
-
-
-
 };
 
+var R = '#f00';
+var G = '#0f0';
+var B = '#00f';
 
-var drawOpponent = (x, y) => {
-  // var offcanvas = document.createElement('canvas');
-  // var offctx = offcanvas.getContext("2d");
-  // var offWidth = offcanvas.width = 32, offHeight = offcanvas.height = 36;
+var drawOpponent = (x, y, w) => {
+  var drawHair = (toctx, paths) => {
+    toctx.strokeStyle = R;
+    toctx.fillStyle = G;
+    fe(paths, p => {
+      toctx.beginPath();
+      toctx.moveTo(p[0], p[1]);
+      toctx.bezierCurveTo(p[2], p[3], p[4], p[5], p[6], p[7]);
+      toctx.fill();
+      toctx.stroke();
+    })
+  }
 
-  var tone = [
-    [197, 140, 133],
-    [236, 188, 180],
-    [80, 51, 53],
-    [89, 47, 42],
-  ][nextRandom(4)];
+  var a = opponent.a, eyesX = 7, eyeWidth = 4;
 
-  var c = tone.map(t => t + (nextRandom() - 4) * 1.5);
-
-  drawObject((offctx) => {
-    var radius = nextRandom(6) + 3;
-    offctx.lineWidth = 1;
-    offctx.strokeStyle = '#f00';
-    offctx.fillStyle = '#0f0';
-    roundRect(offctx, 5, 5, 20, 20, radius, true);
-  }, x, y, c, 40);
-
-  drawObject((offctx) => {
-    var eyesY = 13 + (nextRandom(2) - 1);
-    var eyesGap = 4 + (nextRandom(2) - 1);
-
-    offctx.lineWidth = 1;
-    offctx.fillStyle = '#f00';
-    offctx.fillRect(8, eyesY, 4, 3);
-    offctx.fillRect(11 + eyesGap, eyesY, 4, 3);
-
-    offctx.fillStyle = '#00f';
-    offctx.fillRect(9, eyesY + 1, 1, 1);
-    offctx.fillRect(12 + eyesGap, eyesY + 1, 1, 1);
-  }, x, y, [255, 255, 255], 255);
+  // opponent.a.hs[0] = behind head
+  // opponent.a.hs[1] = in front of head
+  drawObject((offctx) => drawHair(offctx, a.hs[0]), x, y, a.ht, 64, w);
 
   drawObject((offctx) => {
-    offctx.lineWidth = 1;
-    offctx.fillStyle = '#00f';
+    offctx.strokeStyle = R;
+    offctx.fillStyle = G;
+    drawRectangle(offctx, 5, 5, 20, 20, opponent.a.hr);
+  }, x, y, a.s, 40, w);
 
-    var mouthStyle = [
-      // width. height, startX
-      [10, 2, 8],
-      [12, 4, 7],
-    ][nextRandom(2)];
+  drawObject((offctx) => {
+    offctx.fillStyle = R;
+    offctx.fillRect(eyesX, a.ey, eyeWidth, a.eh);
+    offctx.fillRect(eyesX + eyeWidth + a.eg, a.ey, eyeWidth, a.eh);
+    offctx.fillStyle = B;
+    offctx.fillRect(eyesX + 1, a.ey + 1, 1, 1);
+    offctx.fillRect(eyesX + eyeWidth + a.eg + 1, a.ey + 1, 1, 1);
+  }, x, y, [255, 255, 255], 255, w);
 
-    var mouthWidth = mouthStyle[0];
-    var mouthHeight = mouthStyle[1];
+  drawObject((offctx) => {
+    offctx.fillStyle = B;
 
-    var startX = mouthStyle[2];
-    var startY = 19;
+    var c1x = (a.m[0] / 3) + a.m[2];
+    var c1y = 19 + a.m[1];
 
-    var c1x = (mouthWidth / 3) + startX;
-    var c1y = startY + mouthHeight;
+    var c2x = ((a.m[0] / 3) * 2) + a.m[2];
+    var c2y = 19 + a.m[1];
 
-    var c2x = ((mouthWidth / 3) * 2) + startX;
-    var c2y = startY + mouthHeight;
-
-    var endX = startX + mouthWidth;
-    var endY = startY;
+    var endX = a.m[2] + a.m[0];
+    var endY = 19;
 
     offctx.beginPath();
-    offctx.moveTo(startX, startY);
+    offctx.moveTo(a.m[2], 19);
     offctx.bezierCurveTo(c1x, c1y, c2x, c2y, endX, endY);
     offctx.stroke();
-  }, x, y, tone, 110);
+  }, x, y, a.s, 110, w);
 
-
-
-
-
-
-
-  // var skinTone1 = [197, 140, 133]; // rgba
-  // var image = offctx.getImageData(0, 0, offWidth, offHeight)
-  // var pixel = 0;
-
-  // while (pixel < (offWidth * offHeight) * 4) {
-  //   var alphaIndex = pixel + 3;
-  //   if (image.data[alphaIndex] < 128) {
-  //     image.data[alphaIndex] = 0;
-  //   } else {
-
-  //     var c;
-  //     if (image.data[pixel + 0] >= 128)
-  //       c = skinTone1;
-  //     else if (image.data[pixel + 1] >= 128)
-  //       c = skinTone1.map(t => t + 40);
-  //     else
-  //       c = skinTone1.map(t => t - 40);
-
-  //     image.data[pixel + 0] = c[0];
-  //     image.data[pixel + 1] = c[1];
-  //     image.data[pixel + 2] = c[2];
-  //     image.data[alphaIndex] = 255
-  //   }
-  //   pixel += 4;
-  // }
-
-
-
-  // offctx.clearRect(0, 0, offWidth, offHeight);
-  // offctx.putImageData(image, 0, 0);
-
-  // ctx.imageSmoothingEnabled = false;
-  // ctx.drawImage(offcanvas, 200, 200, offWidth * 10, offHeight * 10);
-  // ctx.imageSmoothingEnabled = true;
-
-
-  // roundRect(ctx, 300, 5, 200, 100, {
-  //   tl: 50,
-  //   br: 25
-  // }, true);
-
-
-
-
-
-
-
-
-
-
+  drawObject((offctx) => drawHair(offctx, a.hs[1]), x, y, a.ht, 64, w);
 }
 
-
-/**
- * Draws a rounded rectangle using the current state of the canvas.
- * If you omit the last three params, it will draw a rectangle
- * outline with a 5 pixel border radius
- * @param {CanvasRenderingContext2D} ctx
- * @param {Number} x The top left x coordinate
- * @param {Number} y The top left y coordinate
- * @param {Number} width The width of the rectangle
- * @param {Number} height The height of the rectangle
- * @param {Number} [radius = 5] The corner radius; It can also be an object
- *                 to specify different radii for corners
- * @param {Number} [radius.tl = 0] Top left
- * @param {Number} [radius.tr = 0] Top right
- * @param {Number} [radius.br = 0] Bottom right
- * @param {Number} [radius.bl = 0] Bottom left
- * @param {Boolean} [fill = false] Whether to fill the rectangle.
- * @param {Boolean} [stroke = true] Whether to stroke the rectangle.
- */
-function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
-  if (typeof stroke === 'undefined') {
-    stroke = true;
-  }
-  if (typeof radius === 'undefined') {
-    radius = 5;
-  }
-  if (typeof radius === 'number') {
-    radius = { tl: radius, tr: radius, br: radius, bl: radius };
-  } else {
-    var defaultRadius = { tl: 0, tr: 0, br: 0, bl: 0 };
-    for (var side in defaultRadius) {
-      radius[side] = radius[side] || defaultRadius[side];
-    }
-  }
-  ctx.beginPath();
-  ctx.moveTo(x + radius.tl, y);
-  ctx.lineTo(x + width - radius.tr, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius.tr);
-  ctx.lineTo(x + width, y + height - radius.br);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius.br, y + height);
-  ctx.lineTo(x + radius.bl, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius.bl);
-  ctx.lineTo(x, y + radius.tl);
-  ctx.quadraticCurveTo(x, y, x + radius.tl, y);
-  ctx.closePath();
-  if (fill) {
-    ctx.fill();
-  }
-  if (stroke) {
-    ctx.stroke();
-  }
-
+var drawRectangle = (cc, x, y, width, height, radius) => {
+  cc.beginPath();
+  cc.moveTo(x + radius, y);
+  cc.lineTo(x + width - radius, y);
+  cc.quadraticCurveTo(x + width, y, x + width, y + radius);
+  cc.lineTo(x + width, y + height - radius);
+  cc.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  cc.lineTo(x + radius, y + height);
+  cc.quadraticCurveTo(x, y + height, x, y + height - radius);
+  cc.lineTo(x, y + radius);
+  cc.quadraticCurveTo(x, y, x + radius, y);
+  cc.closePath();
+  cc.fill();
+  cc.stroke();
 }
-
-
-
-
-
-
 
 var onClick = (e) => {
   var x = e.offsetX, y = e.offsetY;
   var button = buttons.reverse().find(i => i.x < x && x < i.xa && i.y < y && y < i.ya);
-  if (!button) return;
+  if (!button) {
+    console.log('missed', x, y);
+    return;
+  }
+
+  console.log('hit', x, y);
 
   if (button.t == 'Accept') {
     buttons = [];
     acceptOffer();
-  } else {
+  } else if (button.t == 'Again') {
+    buttons = [];
+    newGame();
+  }
+  else {
     console.log(button.t);
   }
 };
 
 var makeButton = (x, y, w, h, t) => {
-  // ctx.strokeStyle = "#666";
-  // ctx.strokeRect(x, y, w, h);
-  ctx.font = 'bold 22px cursive';
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(t, x + w / 2, y + h / 2, w);
-  buttons.push({ x: x, y: y, xa: x + w, ya: y + h, t: t });
+  buttons.push({ x: x, y: y, xa: x + w, ya: y + h, t: t, w: w, h: h });
 };
 
 // Thank you, David Braben!
-// TODO: Randomise these seeds.
-var ORIGINAL_LEFT = SEED_LEFT = new Date().getMinutes();
-var ORIGINAL_RIGHT = SEED_RIGHT = new Date().getSeconds();
+var SEED_LEFT = new Date().getMinutes();
+var SEED_RIGHT = new Date().getSeconds();
 
 var nextRandom = (m = 10) => {
-  // l = 85
-  // r = 60
-  //   = 145
   var d = (SEED_LEFT + SEED_RIGHT) / 100, r = f((d - f(d)) * 100);
-  console.debug('SEED_LEFT', SEED_LEFT, 'SEED_RIGHT', SEED_RIGHT, 'd', d, 'r', r);
-
   SEED_LEFT = SEED_RIGHT;
   SEED_RIGHT = r;
   return r % m;
@@ -364,7 +254,6 @@ var makePartial = () => [2, 2, 2, 0].reduce((acc, shift) => {
 
 var showSailor = (sailor) => {
   console.info(`${sailor.n} holds:`);
-  // sailor.f.forEach(file => console.info(`> (file ID: ${file.i.toString().padStart(2, '0')}) ${toBinary(file.b)}`));
   fe(sailor.f, file => console.info(`> (file ID: ${file.i.toString().padStart(2, '0')}) ${toBinary(file.b)}`));
 };
 
@@ -396,7 +285,53 @@ var makeShuffled = (max, length) => {
 
 var makeSailor = (hasPrimary, otherCount, name) => {
   // f: files
-  var sailor = { f: [], n: name };
+  var sailor = {
+    f: [],
+    n: name,
+    // a: avatar
+    a: {
+      // s: skin tone
+      s: [
+        [197, 140, 133],
+        [236, 188, 180],
+        [80, 51, 53],
+        [89, 47, 42],
+      ][nextRandom(4)].map(t => t + (nextRandom() - 4) * 1.5),
+      // ht: hair tone
+      ht: [128 * nextRandom(2), 128 * nextRandom(2), 128 * nextRandom(2)],
+      // hs: hair style
+      hs: [
+        [[], []],
+        [
+          // moveX, moveY, c1x, c1y, c2x, c2y, endX, endY
+          // Behind head
+          [[22 - 18, 10 - 2, 12 - 18, 36 - 2, 38 - 18, 36 - 2, 26 - 18, 3 - 2]],
+          // IN front of head
+          [[22, 10, 12, 36, 38, 36, 26, 3], [26, 3, -9, -6, -3, 18, 25, 9]],
+        ],
+        [
+          // Behind head
+          [],
+          // IN front of head
+          [[26 - 4, 7 - 1, 10 - 4, -6 - 1, -3 - 4, 18 - 1, 25 - 4, 9 - 1]],
+        ],
+      ][nextRandom(3)],
+      // hr: head radius
+      hr: nextRandom(6) + 3,
+      // ey: eyes y
+      ey: nextRandom(3) + 12,
+      // eg: eyes gap
+      eg: nextRandom(2) + 2,
+      // eh: eyes height
+      eh: nextRandom(2) + 2,
+      // m: mouth stylw
+      m: [
+        // width. height, startX
+        [10, 2, 8],
+        [12, 4, 7],
+      ][nextRandom(2)],
+    }
+  };
 
   if (hasPrimary) {
     // The first item in the array is always for the primary client we're
@@ -481,28 +416,6 @@ var findLowValueTransaction = (fromSailor, toSailor, matchValue) => {
   var transactionsToOffer = [];
   var transactionsToOfferTotal = 0;
 
-  // transactions.forEach(t => {
-  //   var totalIfIncluded = t.v + transactionsToOfferTotal;
-  //   var over = totalIfIncluded - matchValue;
-
-  //   if (over > 0) {
-  //     var maxValueFromThisTransaction = matchValue - transactionsToOfferTotal;
-  //     var keep = f(maxValueFromThisTransaction / t.e);
-  //     if (!keep) return;
-  //     var subtractors = makeShuffled(8, 8).map(i => Math.pow(2, i));
-
-  //     while (countSetBits(t.b) > keep) {
-  //       var subtractor = subtractors.pop();
-  //       if ((t.b & subtractor) == subtractor) t.b -= subtractor;
-  //     }
-  //     t.v = calcValue(t.b, t.e);
-  //   }
-
-  //   transactionsToOffer.push(t);
-  //   transactionsToOfferTotal += t.v;
-  // });
-
-
   fe(transactions, t => {
     var totalIfIncluded = t.v + transactionsToOfferTotal;
     var over = totalIfIncluded - matchValue;
@@ -524,18 +437,32 @@ var findLowValueTransaction = (fromSailor, toSailor, matchValue) => {
     transactionsToOfferTotal += t.v;
   });
 
-
-
   return transactionsToOffer;
 };
 
 var logTransaction = t => console.debug(`> "${toBinary(t.b)}" of file (${t.i}) worth $${t.v}.`);
 
 
-var applyTransaction = (s, t) => { if (g = s.f.find(h => h.i == t.i)) g.b += t.b; };
+var applyTransaction = (s, t) => {
+  if (g = s.f.find(h => h.i == t.i)) g.b += t.b; else {
+    s.f.push({
+
+
+
+      m: 1,
+      b: t.b,
+      // Don't allow 0, that's special.
+      i: t.i,
+
+
+
+
+    })
+  }
+};
 
 var MAX_FILE_B = 255;
-var global_winner = null;
+var global_winner;
 
 var acceptOffer = _ => {
   // Apply the opponent's transactions.
@@ -554,17 +481,21 @@ var acceptOffer = _ => {
 
   if (playerWon && opponentWon) {
     // TODO: Special descriptive ending.
-  }
-
-  if (playerWon) {
     global_winner = player;
     console.warn(`You won! :)`);
     showSailor(player);
+    makeButton(50, 50, 100, 50, 'Again');
+  } else if (playerWon) {
+    global_winner = player;
+    console.warn(`You won! :)`);
+    showSailor(player);
+    makeButton(50, 50, 100, 50, 'Again');
   }
   else if (opponentWon) {
     global_winner = opponent;
     console.warn(`${opponent.n} won! :(`);
     showSailor(opponent);
+    makeButton(50, 50, 100, 50, 'Again');
   }
   else {
     console.info(`${opponent.n} walks away with:`);
@@ -587,11 +518,20 @@ var generateOffer = () => {
   var highTransaction = findHighValueTransction(player, opponent);
 
   if (!highTransaction) {
-    console.warn('No offers.');
+    console.warn(`You have nothing of value to ${opponent.n}.`);
     newOpponent();
+    return;
   }
 
   var lowTransactions = findLowValueTransaction(opponent, player, highTransaction.v);
+
+  console.debug('lowTransactions', lowTransactions);
+
+  if (lowTransactions.length == 0) {
+    console.warn(`${opponent.n} has nothing of value to you.`);
+    newOpponent();
+    return;
+  }
 
   global_current_offer = {
     // o: apply to opponent
