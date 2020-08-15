@@ -9,26 +9,42 @@ var CHUNKS_PER_FILE = 8;
 // We use this a lot, so let's not repeat the whole thing every time.
 var f = Math.floor;
 
+var global_current_offer;
 
 var canvas = document.getElementById("c");
 var ctx = canvas.getContext("2d");
 
 var buttons = [];
 
+var draw = () => {
+  ctx.clearRect(0, 0, 800, 600);
+
+  if (global_current_offer) {
+    makeButton(50, 50, 100, 50, "Accept");
+    makeButton(200, 50, 100, 50, "Counter");
+  }
+};
+
 var onClick = (e) => {
   var x = e.offsetX, y = e.offsetY;
-  var button = buttons.reverse().find((i) => {
-    return i.x < x && x < i.xa && i.y < y && y < i.ya;
-  });
-  if (button) console.log(button.t); else console.log('missed', x, y);
+  var button = buttons.reverse().find(i => i.x < x && x < i.xa && i.y < y && y < i.ya);
+  if (!button) return;
+
+  if (button.t == 'Accept') {
+
+  } else {
+    console.log(button.t);
+  }
 };
 
 var makeButton = (x, y, w, h, t) => {
-  console.info('makeButton', x, y, w, h);
-  ctx.strokeStyle = "#666";
-  ctx.strokeRect(x, y, w, h);
+  // ctx.strokeStyle = "#666";
+  // ctx.strokeRect(x, y, w, h);
+  ctx.font = 'bold 22px cursive';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(t, x + w / 2, y + h / 2, w);
   buttons.push({ x: x, y: y, xa: x + w, ya: y + h, t: t });
-  console.info('buttons', buttons);
 };
 
 // Thank you, David Braben!
@@ -43,12 +59,12 @@ var nextRandom = (m = 10) => {
 }
 
 var makePartial = () => [2, 2, 2, 0].reduce((acc, shift) => {
-    acc += nextRandom(4);
-    return acc <<= shift;
-  }, 0);
+  acc += nextRandom(4);
+  return acc <<= shift;
+}, 0);
 
 var showSailor = (sailor) => {
-  console.info(`${sailor.n} currently holds:`);
+  console.info(`${sailor.n} holds:`);
   sailor.f.forEach(file => console.info(`> (file ID: ${file.i.toString().padStart(2, '0')}) ${toBinary(file.b)}`));
 };
 
@@ -126,14 +142,13 @@ var getSailorFile = (sailor, id) => sailor.f.find(f => f.i == id);
 
 var findHighValueTransction = (fromSailor, toSailor) => {
   // Maximise value for `toSailor`.
-  var highestValueTransaction = {v:0};
+  var highestValueTransaction = { v: 0 };
 
   findCommonFiles(fromSailor, toSailor).forEach(id => {
     var fromFile = getSailorFile(fromSailor, id);
     var toFile = getSailorFile(toSailor, id);
     var offer = (toFile.b ^ fromFile.b) & fromFile.b;
     var value = calcValue(offer, fromFile.m);
-    // console.debug(`A transfer of ${toBinary(offer)} for file ${id} would be worth $${value}.`);
     if (value > highestValueTransaction.v) {
       highestValueTransaction.i = id;
       highestValueTransaction.b = offer;
@@ -144,29 +159,22 @@ var findHighValueTransction = (fromSailor, toSailor) => {
   return highestValueTransaction;
 }
 
-// var MAX_FILE_VALUE = 255;
-
-
 var findFullTransaction = (fromSailor, toSailor, id) => {
-  var r = {i: id};
+  var r = { i: id };
   var fromFile = getSailorFile(fromSailor, id);
   var toFile = getSailorFile(toSailor, id);
   r.b = ((toFile ? toFile.b : 0) ^ fromFile.b) & fromFile.b;
   r.v = calcValue(r.b, fromFile.m);
   // e = value of each
   r.e = fromFile.m;
-  // console.debug(`${fromSailor.n} could copy $${r.v} of chunks of file ${id} to ${toSailor.n}.`);
   return r;
 }
-
-var showTransaction = t => console.debug(`[transaction] "${toBinary(t.b)}" of file (${t.i}) worth $${t.v}.`);
-
 
 var findLowValueTransaction = (fromSailor, toSailor, matchValue) => {
   // Minimise value for `toSailor`.
   var transactions = [];
   transactions = fromSailor.f.map(file => findFullTransaction(fromSailor, toSailor, file.i));
-  transactions.sort((x,y) => x.v > y.v);
+  transactions.sort((x, y) => x.v > y.v);
 
   var transactionsToOffer = [];
   var transactionsToOfferTotal = 0;
@@ -181,7 +189,7 @@ var findLowValueTransaction = (fromSailor, toSailor, matchValue) => {
       if (!keep) return;
       var subtractors = makeShuffled(8, 8).map(i => Math.pow(2, i));
 
-      while(countSetBits(t.b) > keep) {
+      while (countSetBits(t.b) > keep) {
         var subtractor = subtractors.pop();
         if ((t.b & subtractor) == subtractor) t.b -= subtractor;
       }
@@ -195,55 +203,40 @@ var findLowValueTransaction = (fromSailor, toSailor, matchValue) => {
   return transactionsToOffer;
 };
 
+var logTransaction = t => console.debug(`> "${toBinary(t.b)}" of file (${t.i}) worth $${t.v}.`);
 
-// var showOffer = offer => console.debug(`An offer to copy file ${offer.i} chunks "${toBinary(offer.b)}" from ${offer.f.n} to ${offer.t.n}.`);
-
-// var global_current_offer;
+var logOffer = o => {
+  console.info(`${o.a.n} has an offer on the table!`);
+  console.info(`${o.a.n} will take:`);
+  o.t.forEach(t => logTransaction(t));
+  console.info(`In return, ${o.a.n} will offer:`);
+  o.r.forEach(t => logTransaction(t));
+}
 
 var generateOffer = () => {
-  // var currSailorValue = countSetBits(save.b) * save.v;
-  // console.info(`The sailor's data is currently worth $${currSailorValue}.`)
-
   var highTransaction = findHighValueTransction(player, opponent);
-  console.info(`${opponent.n} wants:`);
-  showTransaction(highTransaction);
-
   var lowTransactions = findLowValueTransaction(opponent, player, highTransaction.v);
-  console.info(`In return, ${opponent.n} will offer:`)
-  lowTransactions.forEach(t => showTransaction(t));
 
+  global_current_offer = {
+    // a: from sailor
+    a: opponent,
+    // b: to sailor
+    b: player,
+    // t: from sailor will take
+    t: [highTransaction],
+    // r: from sailor offers in return
+    r: lowTransactions
+  };
 
-  // if (lowTransaction) showTransaction(lowTransaction);
+  logOffer(global_current_offer);
 
-  // var want = (save.b ^ scam.b) & scam.b;
-  // showBits(want);
-  // var takeValue = calcValue(want, save.m);
-  // console.info(`This transaction is worth $${takeValue}.`)
+  requestAnimationFrame(draw);
 
-  // // The sailor will offer 80% value in return.
-  // var returnValue = f(takeValue * 0.8);
-  // console.info(`The sailor will offer $${returnValue} in return.`);
-
-  // The sailor will offer the same VALUE in return, but not necessarily for
-  // the same file. They might offer some parts of a lower-value file.
-  //
-  // The sailor will only offer to let you complete a file if the value they
-  // receive from the trade is 2x the value you will receive from your
-  // completed file.
-
-
-  // console.info(`The sailor says, "I will offer you ${returnCount} parts in return:"`);
-
-
-  // If we need 1 chunk then the sailor will offer it. The sailor code demands honor. And maybe he can continue selling the data to folks who don't know it's complete. Hah, maybe you're not even the first.
+  // TODO: If the lowTransactions are < 80% of the highTransactions then the
+  //       opponent should feel bad and recalcuate the highTransaction to no
+  //       more than 80% over the lowTransaction.
 
 }
 
-
-
-
 canvas.addEventListener('click', onClick);
-
-
-// makeButton(10, 10, 100, 50, 'test');
 newGame();
