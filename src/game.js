@@ -34,18 +34,151 @@ var makeName = _ => {
 };
 
 
+var baseFileWidth = CHUNKS_PER_FILE * 10 + 1;
+
+var drawFiles = (forPlayer, x, y, w) => {
+  var drawChunkSquare = w / baseFileWidth * 10;
+
+  var nextY = y;
+  var gap = 9;
+
+  var files = forPlayer ? player.f : opponent.f;
+
+  for (var i = 0; i < files.length; i++) {
+    nextY = gap + drawFile(forPlayer, files[i], x, nextY, w, drawChunkSquare);
+  }
+}
+
+var drawFile = (forPlayer, file, x, y, w, drawChunkSquare) => {
+
+  ctx.fillStyle = 'black';
+  ctx.font = 'bold 16px monospace';
+  ctx.textAlign = "left";
+  ctx.fillText(file.i, x, y);
+
+  var thisGive, thisReceive;
+
+
+  var fileAtY = y + 16;
+  var transAtY = fileAtY;
+
+  var transBufferWidth = 10, transBufferHeight = 5;
+
+  if (global_current_offer && forPlayer) {
+
+    thisReceive = global_current_offer.p.find(h => h.i == file.i);
+    thisGive = global_current_offer.o.find(h => h.i == file.i);
+
+    if (thisReceive || thisGive) {
+      var transactionHeight = calcDrawHeight(transBufferWidth, transBufferHeight, drawChunkSquare);
+      fileAtY += transactionHeight / 2;
+    }
+
+  }
+
+  // TODO: Handle receiving chunks for a file we haven't started yet.
+
+  var th = drawObject((offctx) => {
+    offctx.fillStyle = R;
+    offctx.fillRect(0, 0, 81, 10);
+  },
+    81, 10,         // buffer dimensions
+    x, fileAtY, w,  // x, y, width to draw on canvas
+    [0, 0, 0],      // color to paint reds as
+    0,              // color deviation for greens and blues
+  );
+
+  for (var i = 0; i < CHUNKS_PER_FILE; i++) {
+    drawObject((offctx) => {
+      var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
+      offctx.fillStyle = (file.b & thisPow) == thisPow ? G : B;
+      offctx.fillRect(1, 1, 9, 8);
+    },
+      10, 10,                                             // buffer width
+      x + i * drawChunkSquare, fileAtY, drawChunkSquare,  // x, y, width to draw on canvas
+      [0, 255, 0],                                        // color to paint reds as
+      160,                                                // color deviation for greens and blues
+    );
+  }
+
+  if (thisGive)
+    for (var i = 0; i < CHUNKS_PER_FILE; i++) {
+      var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
+      if ((thisGive.b & thisPow) != thisPow) continue;
+      drawObject((offctx) => {
+        offctx.beginPath();
+        offctx.moveTo(1, 4);
+        offctx.lineTo(5, 0);
+        offctx.lineTo(6, 0);
+        offctx.lineTo(10, 4);
+
+        offctx.closePath();
+
+        offctx.fillStyle = R;
+        offctx.fill();
+
+        offctx.strokeStyle = B;
+        offctx.stroke();
+      },
+        transBufferWidth, transBufferHeight,                                              // buffer width
+        x + i * drawChunkSquare, transAtY, drawChunkSquare,  // x, y, width to draw on canvas
+        [255, 0, 0],                                         // color to paint reds as
+        180,                                                 // color deviation for greens and blues
+      );
+    }
+
+  if (thisReceive)
+    for (var i = 0; i < CHUNKS_PER_FILE; i++) {
+      var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
+      if ((thisReceive.b & thisPow) != thisPow) continue;
+      drawObject((offctx) => {
+        offctx.beginPath();
+        offctx.moveTo(1, 0);
+        offctx.lineTo(5, 4);
+        offctx.lineTo(6, 4);
+        offctx.lineTo(10, 0);
+        offctx.closePath();
+
+        offctx.fillStyle = R;
+        offctx.fill();
+
+        offctx.strokeStyle = B;
+        offctx.stroke();
+      },
+        transBufferWidth, transBufferHeight,                                              // buffer width
+        x + i * drawChunkSquare, transAtY, drawChunkSquare,  // x, y, width to draw on canvas
+        [0, 0, 255],                                         // color to paint reds as
+        180,                                                 // color deviation for greens and blues
+      );
+    }
+
+
+
+
+
+
+
+  return fileAtY + th;
+};
 
 
 var draw = () => {
   var w = canvas.width = window.innerWidth;
   var h = canvas.height = window.innerHeight;
-  var margin = 20;
+  var pagePaddingX = w * 0.02;
+  var pagePaddingY = h * 0.02;
+  var pagePaddedWidth = w - (pagePaddingX * 2);
+  var pagePaddedHeight = h - (pagePaddingY * 2);
+  var cellDim = Math.min(pagePaddedWidth / 3, pagePaddedHeight / 2);
+  var cellPadding = cellDim * 0.02;
+  var cellPaddedDim = cellDim - (cellPadding * 2);
+  var gridWidth = cellDim * 3;
+  var gridHeight = cellDim * 2;
+  var pageOriginX = (w / 2) - (gridWidth / 2);
+  var pageOriginY = (h / 2) - (gridHeight / 2);
 
-  // var w = canvas.width, h = canvas.height;
-
-  ctx.fillStyle = 'yellow';
+  ctx.fillStyle = 'lightgray';
   ctx.fillRect(0, 0, w, h);
-  // ctx.clearRect(0, 0, 800, 600);
 
   ctx.fillStyle = 'black';
   ctx.font = 'bold 22px cursive';
@@ -53,93 +186,156 @@ var draw = () => {
   ctx.textBaseline = "top";
   ctx.fillText(`${w} x ${h}`, 0, 0);
 
+  var row1PaddedOriginY = pageOriginY + cellPadding;
+  var row2PaddedOriginY = pageOriginY + cellDim + cellPadding;
+
+  var col1PaddedOriginX = pageOriginX + cellPadding;
+  var col2PaddedOriginX = pageOriginX + cellDim + cellPadding;
+  var col3PaddedOriginX = pageOriginX + cellDim + cellDim + cellPadding;
+
+  if (false) {
+    ctx.strokeStyle = 'red';
+    ctx.strokeRect(
+      col1PaddedOriginX,
+      row1PaddedOriginY,
+      cellPaddedDim, cellPaddedDim
+    );
+    ctx.strokeRect(
+      col2PaddedOriginX,
+      row1PaddedOriginY,
+      cellPaddedDim, cellPaddedDim
+    );
+    ctx.strokeRect(
+      col3PaddedOriginX,
+      row1PaddedOriginY,
+      cellPaddedDim, cellPaddedDim
+    );
+    ctx.strokeRect(
+      col1PaddedOriginX,
+      row2PaddedOriginY,
+      cellPaddedDim,
+      cellPaddedDim
+    );
+    ctx.strokeRect(
+      col2PaddedOriginX,
+      row2PaddedOriginY,
+      cellPaddedDim,
+      cellPaddedDim
+    );
+    ctx.strokeRect(
+      col3PaddedOriginX,
+      row2PaddedOriginY,
+      cellPaddedDim,
+      cellPaddedDim
+    );
+  }
+
   if (opponent) {
-    var hw = f(w / 2)
-    var maxWidth = hw - margin;
-    var maxHeight = h - (margin * 2);
-    var dim = (maxWidth > maxHeight) ? maxHeight : maxWidth;
-    var oppX = (w * 0.75) - (dim / 2);
-    var oppY = (h / 2) - (dim / 2);
-    drawOpponent(oppX, oppY, dim);
+    drawFiles(false, col2PaddedOriginX, row1PaddedOriginY, cellPaddedDim);
+    drawSailor(opponent, col3PaddedOriginX, row1PaddedOriginY, cellPaddedDim);
   }
 
-  if (global_current_offer) {
-    makeButton(50, 50, 100, 50, 'Accept');
-    makeButton(200, 50, 100, 50, 'Counter');
-  }
+  drawSailor(player, col1PaddedOriginX, row2PaddedOriginY, cellPaddedDim, true);
+  drawFiles(true, col2PaddedOriginX, row2PaddedOriginY, cellPaddedDim);
 
-  ctx.font = 'bold 22px cursive';
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = '#000';
-  fe(buttons, b => {
-    ctx.fillText(b.t, b.x + (b.w / 2), b.y + (b.h / 2), b.w, b.h);
-    ctx.strokeRect(b.x, b.y, b.w, b.h);
-  });
+  // if (global_current_offer) {
+  //   makeButton(50, 50, 100, 50, 'Accept');
+  //   makeButton(200, 50, 100, 50, 'Counter');
+  // }
 
+  // ctx.font = 'bold 22px cursive';
+  // ctx.textAlign = "center";
+  // ctx.textBaseline = "middle";
+  // ctx.fillStyle = '#000';
+  // fe(buttons, b => {
+  //   ctx.fillText(b.t, b.x + (b.w / 2), b.y + (b.h / 2), b.w, b.h);
+  //   ctx.strokeRect(b.x, b.y, b.w, b.h);
+  // });
 };
-
-window.addEventListener('resize', draw, true);
-window.addEventListener('orientationchange', draw, true);
-
 
 var fi = (a, f) => a.find(f);
 
-
+// c: color [r, g, b]
+// d: +/- for tones
 // Change red pixels to tone.
 // Change green pixels to tone + 40
 // Change blue pixels to tone - 40
-
-
-// c: color [r, g, b]
-// d: +/- for tones
-var drawObject = (g, x, y, c, d, w) => {
+// cw: (hidden) canvas width
+// ch: (hidden) canvas height
+// dx: draw x (on visible canvas)
+// dy: draw y (on visible canvas)
+// dw: draw width (on visible canvas)
+var drawObject = (g, cw, ch, dx, dy, dw, c, d, mirror) => {
   var offcanvas = document.createElement('canvas');
-  var offctx = offcanvas.getContext("2d");
-  var offWidth = offcanvas.width = 31, offHeight = offcanvas.height = 31;
+  var offctx = offcanvas.getContext('2d');
+
+  offcanvas.width = cw;
+  offcanvas.height = ch;
 
   offctx.lineWidth = 1;
 
   g(offctx);
 
-  var image = offctx.getImageData(0, 0, offWidth, offHeight)
-  var pixel = 0;
+  var image = offctx.getImageData(0, 0, cw, ch)
 
-  while (pixel < (offWidth * offHeight) * 4) {
-    var alphaIndex = pixel + 3;
-    if (image.data[alphaIndex] < 128) {
-      image.data[alphaIndex] = 0;
-    } else {
+  var buffer = [];
 
-      var z;
-      if (image.data[pixel + 0] >= 128)
-        z = c;
-      else if (image.data[pixel + 1] >= 128)
-        z = c.map(t => t + d);
-      else
-        z = c.map(t => t - d);
+  for (var row = 0; row < ch; row++)
+    for (var vcolumn = 0; vcolumn < cw; vcolumn++) {
 
-      image.data[pixel + 0] = z[0];
-      image.data[pixel + 1] = z[1];
-      image.data[pixel + 2] = z[2];
-      image.data[alphaIndex] = 255
+      var column = mirror ? cw - vcolumn - 1 : vcolumn;
+
+      var pixel = row * (cw * 4) + (column * 4);
+      var alphaIndex = pixel + 3;
+      if (image.data[alphaIndex] < 128) {
+        buffer.push(0);
+        buffer.push(0);
+        buffer.push(0);
+        buffer.push(0);
+      } else {
+
+        var z;
+        if (image.data[pixel + 0] >= 128)
+          z = c;
+        else if (image.data[pixel + 1] >= 128)
+          z = c.map(t => t + d);
+        else
+          z = c.map(t => t - d);
+
+        buffer.push(z[0]);
+        buffer.push(z[1]);
+        buffer.push(z[2]);
+        buffer.push(255);
+      }
     }
-    pixel += 4;
-  }
 
-  offctx.clearRect(0, 0, offWidth, offHeight);
+  for (var b = 0; b < buffer.length; b++)
+    image.data[b] = buffer[b];
+
+  // Redraw the buffer with the pixellated image.
+  offctx.clearRect(0, 0, cw, ch);
   offctx.putImageData(image, 0, 0);
 
+  var dh = calcDrawHeight(cw, ch, dw);
+
+  // Now copy the buffer into the visible canvas in a beautiful, pixelly way.
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(offcanvas, x, y, w, (w / offWidth) * offHeight);
+  ctx.drawImage(offcanvas, dx, dy, dw, dh);
   ctx.imageSmoothingEnabled = true;
+
+  return dh;
 };
+
+// cw: buffer width
+// ch: buffer height
+// dw: draw width
+var calcDrawHeight = (cw, ch, dw) => dw / cw * ch;
 
 var R = '#f00';
 var G = '#0f0';
 var B = '#00f';
 
-var drawOpponent = (x, y, w) => {
+var drawSailor = (s, x, y, w, mirror) => {
   var drawHair = (toctx, paths) => {
     toctx.strokeStyle = R;
     toctx.fillStyle = G;
@@ -152,17 +348,31 @@ var drawOpponent = (x, y, w) => {
     })
   }
 
-  var a = opponent.a, eyesX = 7, eyeWidth = 4;
+  var a = s.a, eyesX = 7, eyeWidth = 4, bufferWidth = 31;
 
-  // opponent.a.hs[0] = behind head
-  // opponent.a.hs[1] = in front of head
-  drawObject((offctx) => drawHair(offctx, a.hs[0]), x, y, a.ht, 64, w);
+
+  // s.a.hs[0] = behind head
+  // s.a.hs[1] = in front of head
+  drawObject((offctx) => drawHair(offctx, a.hs[0]),
+    bufferWidth, bufferWidth,        // buffer dimensions
+    x, y, w,     // x, y, width to draw on canvas
+    a.ht,        // color to paint reds as
+    64,          // color deviation for greens and blues
+    mirror,      // mirror
+  );
+
 
   drawObject((offctx) => {
     offctx.strokeStyle = R;
     offctx.fillStyle = G;
-    drawRectangle(offctx, 5, 5, 20, 20, opponent.a.hr);
-  }, x, y, a.s, 40, w);
+    drawRectangle(offctx, 5, 5, 20, 20, a.hr);
+  },
+    bufferWidth, bufferWidth,        // buffer dimensions
+    x, y, w,     // x, y, width to draw on canvas
+    a.s,        // color to paint reds as
+    40,          // color deviation for greens and blues
+    mirror,      // mirror
+  );
 
   drawObject((offctx) => {
     offctx.fillStyle = R;
@@ -171,7 +381,13 @@ var drawOpponent = (x, y, w) => {
     offctx.fillStyle = B;
     offctx.fillRect(eyesX + 1, a.ey + 1, 1, 1);
     offctx.fillRect(eyesX + eyeWidth + a.eg + 1, a.ey + 1, 1, 1);
-  }, x, y, [255, 255, 255], 255, w);
+  },
+    bufferWidth, bufferWidth, // buffer width
+    x, y, w,     // x, y, width to draw on canvas
+    [255, 255, 255],        // color to paint reds as
+    255,          // color deviation for greens and blues
+    mirror,      // mirror
+  );
 
   drawObject((offctx) => {
     offctx.fillStyle = B;
@@ -189,9 +405,21 @@ var drawOpponent = (x, y, w) => {
     offctx.moveTo(a.m[2], 19);
     offctx.bezierCurveTo(c1x, c1y, c2x, c2y, endX, endY);
     offctx.stroke();
-  }, x, y, a.s, 110, w);
+  },
+    bufferWidth, bufferWidth, // buffer width
+    x, y, w,     // x, y, width to draw on canvas
+    a.s,        // color to paint reds as
+    110,          // color deviation for greens and blues
+    mirror,      // mirror
+  );
 
-  drawObject((offctx) => drawHair(offctx, a.hs[1]), x, y, a.ht, 64, w);
+  drawObject((offctx) => drawHair(offctx, a.hs[1]),
+    bufferWidth, bufferWidth, // buffer width
+    x, y, w,     // x, y, width to draw on canvas
+    a.ht,        // color to paint reds as
+    64,          // color deviation for greens and blues
+    mirror,      // mirror
+  );
 }
 
 var drawRectangle = (cc, x, y, width, height, radius) => {
@@ -237,8 +465,7 @@ var makeButton = (x, y, w, h, t) => {
 };
 
 // Thank you, David Braben!
-var SEED_LEFT = new Date().getMinutes();
-var SEED_RIGHT = new Date().getSeconds();
+var SEED_LEFT = new Date().getMinutes(), SEED_RIGHT = new Date().getSeconds();
 
 var nextRandom = (m = 10) => {
   var d = (SEED_LEFT + SEED_RIGHT) / 100, r = f((d - f(d)) * 100);
@@ -247,8 +474,8 @@ var nextRandom = (m = 10) => {
   return r % m;
 }
 
-var makePartial = () => [2, 2, 2, 0].reduce((acc, shift) => {
-  acc += nextRandom(4);
+var makePartial = () => [4, 0].reduce((acc, shift) => {
+  acc += nextRandom(14) + 1;
   return acc <<= shift;
 }, 0);
 
@@ -270,9 +497,7 @@ var newGame = () => {
 };
 
 var newOpponent = () => {
-  showSailor(player);
   opponent = makeSailor(true, 3, makeName());
-  showSailor(opponent);
   generateOffer();
 }
 
@@ -356,6 +581,11 @@ var makeSailor = (hasPrimary, otherCount, name) => {
       i: i + 1,
     }));
 
+
+  if (sailor.f.filter(t => t.b == 0) == sailor.f.length) {
+    console.error(`All zeroes?!`);
+    return null;
+  }
 
 
   return sailor;
@@ -525,8 +755,6 @@ var generateOffer = () => {
 
   var lowTransactions = findLowValueTransaction(opponent, player, highTransaction.v);
 
-  console.debug('lowTransactions', lowTransactions);
-
   if (lowTransactions.length == 0) {
     console.warn(`${opponent.n} has nothing of value to you.`);
     newOpponent();
@@ -550,5 +778,10 @@ var generateOffer = () => {
 
 }
 
+
 canvas.addEventListener('click', onClick);
+
+window.addEventListener('resize', draw, true);
+window.addEventListener('orientationchange', draw, true);
+
 newGame();
