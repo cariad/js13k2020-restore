@@ -41,73 +41,50 @@ var drawFiles = (files, x, y, w) => {
   var drawChunkSquare = w / baseFileWidth * baseChunkSquare;
 
   var nextY = y;
+  var gap = 9;
 
   for (var i = 0; i < files.length; i++) {
-    nextY = drawFile(files[i], x, nextY, w, drawChunkSquare);
+    nextY = gap + drawFile(files[i], x, nextY, w, drawChunkSquare);
   }
 }
 
 
 var drawFile = (file, x, y, w, drawChunkSquare) => {
 
-  ctx.strokeStyle = 'red';
-  ctx.strokeRect(x, y, w, 20);
 
-  bottomY = y + 20;
+  // var fileHeight = drawChunkSquare + 2;
 
 
   ctx.fillStyle = 'black';
   ctx.font = 'bold 16px monospace';
   ctx.textAlign = "left";
-  ctx.fillText('README.md', x, y);
+  ctx.fillText(file.i, x, y);
 
+  var nextY = y + 16;
 
-  return bottomY;
+  var th = drawObject((offctx) => {
+    offctx.fillStyle = R;
+    offctx.fillRect(0, 0, 81, 10);
+  },
+    81, 10,    // buffer dimensions
+    x, nextY, w,   // x, y, width to draw on canvas
+    [0, 0, 0], // color to paint reds as
+    0,         // color deviation for greens and blues
+  );
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // drawObject((offctx) => {
-  //   offctx.fillStyle = R;
-  //   offctx.fillRect(0, 0, baseFileWidth, baseChunkSquare);
-  // },
-  //   baseFileWidth,        // buffer width
-  //   x, y, w, // x, y, width to draw on canvas
-  //   [0, 0, 0], // color to paint reds as
-  //   0,         // color deviation for greens and blues
-  // );
-
-  // for (var i = 0; i < CHUNKS_PER_FILE; i++) {
-  //   drawObject((offctx) => {
-  //     var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
-  //     offctx.fillStyle = (file.b & thisPow) == thisPow ? G : B;
-  //     offctx.fillRect(1, 1, 9, 8);
-  //   },
-  //     baseChunkSquare,                // buffer width
-  //     x + i * drawChunkSquare, y, drawChunkSquare, // x, y, width to draw on canvas
-  //     [0, 255, 0],       // color to paint reds as
-  //     160,                 // color deviation for greens and blues
-  //   );
-  // }
+  for (var i = 0; i < CHUNKS_PER_FILE; i++) {
+    drawObject((offctx) => {
+      var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
+      offctx.fillStyle = (file.b & thisPow) == thisPow ? G : B;
+      offctx.fillRect(1, 1, 9, 8);
+    },
+      baseChunkSquare, baseChunkSquare,                 // buffer width
+      x + i * drawChunkSquare, nextY, drawChunkSquare, // x, y, width to draw on canvas
+      [0, 255, 0],       // color to paint reds as
+      160,                 // color deviation for greens and blues
+    );
+  }
+  return nextY + th;
 
 };
 
@@ -224,25 +201,27 @@ var fi = (a, f) => a.find(f);
 // c: color [r, g, b]
 // d: +/- for tones
 // cw: (hidden) canvas width
+// ch: (hidden) canvas height
 
 // dx: draw x (on visible canvas)
 // dy: draw y (on visible canvas)
 // dw: draw width (on visible canvas)
-var drawObject = (g, cw, dx, dy, dw, c, d, mirror) => {
+var drawObject = (g, cw, ch, dx, dy, dw, c, d, mirror) => {
   var offcanvas = document.createElement('canvas');
   var offctx = offcanvas.getContext('2d');
 
-  offcanvas.width = offcanvas.height = cw;
+  offcanvas.width = cw;
+  offcanvas.height = ch;
 
   offctx.lineWidth = 1;
 
   g(offctx);
 
-  var image = offctx.getImageData(0, 0, cw, cw)
+  var image = offctx.getImageData(0, 0, cw, ch)
 
   var buffer = [];
 
-  for (var row = 0; row < cw; row++)
+  for (var row = 0; row < ch; row++)
     for (var vcolumn = 0; vcolumn < cw; vcolumn++) {
 
       var column = mirror ? cw - vcolumn - 1 : vcolumn;
@@ -277,14 +256,17 @@ var drawObject = (g, cw, dx, dy, dw, c, d, mirror) => {
 
 
   // Redraw the buffer with the pixellated image.
-  offctx.clearRect(0, 0, cw, cw);
+  offctx.clearRect(0, 0, cw, ch);
   offctx.putImageData(image, 0, 0);
 
+  var dh = dw / cw * ch;
 
   // Now copy the buffer into the visible canvas in a beautiful, pixelly way.
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(offcanvas, dx, dy, dw, dw);
+  ctx.drawImage(offcanvas, dx, dy, dw, dh);
   ctx.imageSmoothingEnabled = true;
+
+  return dh;
 };
 
 var R = '#f00';
@@ -310,7 +292,7 @@ var drawSailor = (s, x, y, w, mirror) => {
   // s.a.hs[0] = behind head
   // s.a.hs[1] = in front of head
   drawObject((offctx) => drawHair(offctx, a.hs[0]),
-    bufferWidth, // buffer width
+    bufferWidth, bufferWidth,        // buffer dimensions
     x, y, w,     // x, y, width to draw on canvas
     a.ht,        // color to paint reds as
     64,          // color deviation for greens and blues
@@ -323,7 +305,7 @@ var drawSailor = (s, x, y, w, mirror) => {
     offctx.fillStyle = G;
     drawRectangle(offctx, 5, 5, 20, 20, a.hr);
   },
-    bufferWidth, // buffer width
+    bufferWidth, bufferWidth,        // buffer dimensions
     x, y, w,     // x, y, width to draw on canvas
     a.s,        // color to paint reds as
     40,          // color deviation for greens and blues
@@ -338,7 +320,7 @@ var drawSailor = (s, x, y, w, mirror) => {
     offctx.fillRect(eyesX + 1, a.ey + 1, 1, 1);
     offctx.fillRect(eyesX + eyeWidth + a.eg + 1, a.ey + 1, 1, 1);
   },
-    bufferWidth, // buffer width
+    bufferWidth, bufferWidth, // buffer width
     x, y, w,     // x, y, width to draw on canvas
     [255, 255, 255],        // color to paint reds as
     255,          // color deviation for greens and blues
@@ -362,7 +344,7 @@ var drawSailor = (s, x, y, w, mirror) => {
     offctx.bezierCurveTo(c1x, c1y, c2x, c2y, endX, endY);
     offctx.stroke();
   },
-    bufferWidth, // buffer width
+    bufferWidth, bufferWidth, // buffer width
     x, y, w,     // x, y, width to draw on canvas
     a.s,        // color to paint reds as
     110,          // color deviation for greens and blues
@@ -370,7 +352,7 @@ var drawSailor = (s, x, y, w, mirror) => {
   );
 
   drawObject((offctx) => drawHair(offctx, a.hs[1]),
-    bufferWidth, // buffer width
+    bufferWidth, bufferWidth, // buffer width
     x, y, w,     // x, y, width to draw on canvas
     a.ht,        // color to paint reds as
     64,          // color deviation for greens and blues
