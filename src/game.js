@@ -34,42 +34,58 @@ var makeName = _ => {
 };
 
 
-var baseChunkSquare = 10;
-var baseFileWidth = CHUNKS_PER_FILE * baseChunkSquare + 1;
+var baseFileWidth = CHUNKS_PER_FILE * 10 + 1;
 
-var drawFiles = (files, x, y, w) => {
-  var drawChunkSquare = w / baseFileWidth * baseChunkSquare;
+var drawFiles = (forPlayer, x, y, w) => {
+  var drawChunkSquare = w / baseFileWidth * 10;
 
   var nextY = y;
   var gap = 9;
 
+  var files = forPlayer ? player.f : opponent.f;
+
   for (var i = 0; i < files.length; i++) {
-    nextY = gap + drawFile(files[i], x, nextY, w, drawChunkSquare);
+    nextY = gap + drawFile(forPlayer, files[i], x, nextY, w, drawChunkSquare);
   }
 }
 
-
-var drawFile = (file, x, y, w, drawChunkSquare) => {
-
-
-  // var fileHeight = drawChunkSquare + 2;
-
+var drawFile = (forPlayer, file, x, y, w, drawChunkSquare) => {
 
   ctx.fillStyle = 'black';
   ctx.font = 'bold 16px monospace';
   ctx.textAlign = "left";
   ctx.fillText(file.i, x, y);
 
-  var nextY = y + 16;
+  var thisGive, thisReceive;
+
+
+  var fileAtY = y + 16;
+  var transAtY = fileAtY;
+
+  var transBufferWidth = 10, transBufferHeight = 5;
+
+  if (global_current_offer && forPlayer) {
+
+    thisReceive = global_current_offer.p.find(h => h.i == file.i);
+    thisGive = global_current_offer.o.find(h => h.i == file.i);
+
+    if (thisReceive || thisGive) {
+      var transactionHeight = calcDrawHeight(transBufferWidth, transBufferHeight, drawChunkSquare);
+      fileAtY += transactionHeight / 2;
+    }
+
+  }
+
+  // TODO: Handle receiving chunks for a file we haven't started yet.
 
   var th = drawObject((offctx) => {
     offctx.fillStyle = R;
     offctx.fillRect(0, 0, 81, 10);
   },
-    81, 10,    // buffer dimensions
-    x, nextY, w,   // x, y, width to draw on canvas
-    [0, 0, 0], // color to paint reds as
-    0,         // color deviation for greens and blues
+    81, 10,         // buffer dimensions
+    x, fileAtY, w,  // x, y, width to draw on canvas
+    [0, 0, 0],      // color to paint reds as
+    0,              // color deviation for greens and blues
   );
 
   for (var i = 0; i < CHUNKS_PER_FILE; i++) {
@@ -78,42 +94,90 @@ var drawFile = (file, x, y, w, drawChunkSquare) => {
       offctx.fillStyle = (file.b & thisPow) == thisPow ? G : B;
       offctx.fillRect(1, 1, 9, 8);
     },
-      baseChunkSquare, baseChunkSquare,                 // buffer width
-      x + i * drawChunkSquare, nextY, drawChunkSquare, // x, y, width to draw on canvas
-      [0, 255, 0],       // color to paint reds as
-      160,                 // color deviation for greens and blues
+      10, 10,                                             // buffer width
+      x + i * drawChunkSquare, fileAtY, drawChunkSquare,  // x, y, width to draw on canvas
+      [0, 255, 0],                                        // color to paint reds as
+      160,                                                // color deviation for greens and blues
     );
   }
-  return nextY + th;
 
+  if (thisGive)
+    for (var i = 0; i < CHUNKS_PER_FILE; i++) {
+      var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
+      if ((thisGive.b & thisPow) != thisPow) continue;
+      drawObject((offctx) => {
+        offctx.beginPath();
+        offctx.moveTo(1, 4);
+        offctx.lineTo(5, 0);
+        offctx.lineTo(6, 0);
+        offctx.lineTo(10, 4);
+
+        offctx.closePath();
+
+        offctx.fillStyle = R;
+        offctx.fill();
+
+        offctx.strokeStyle = B;
+        offctx.stroke();
+      },
+        transBufferWidth, transBufferHeight,                                              // buffer width
+        x + i * drawChunkSquare, transAtY, drawChunkSquare,  // x, y, width to draw on canvas
+        [255, 0, 0],                                         // color to paint reds as
+        180,                                                 // color deviation for greens and blues
+      );
+    }
+
+  if (thisReceive)
+    for (var i = 0; i < CHUNKS_PER_FILE; i++) {
+      var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
+      if ((thisReceive.b & thisPow) != thisPow) continue;
+      drawObject((offctx) => {
+        offctx.beginPath();
+        offctx.moveTo(1, 0);
+        offctx.lineTo(5, 4);
+        offctx.lineTo(6, 4);
+        offctx.lineTo(10, 0);
+        offctx.closePath();
+
+        offctx.fillStyle = R;
+        offctx.fill();
+
+        offctx.strokeStyle = B;
+        offctx.stroke();
+      },
+        transBufferWidth, transBufferHeight,                                              // buffer width
+        x + i * drawChunkSquare, transAtY, drawChunkSquare,  // x, y, width to draw on canvas
+        [0, 0, 255],                                         // color to paint reds as
+        180,                                                 // color deviation for greens and blues
+      );
+    }
+
+
+
+
+
+
+
+  return fileAtY + th;
 };
 
 
 var draw = () => {
   var w = canvas.width = window.innerWidth;
   var h = canvas.height = window.innerHeight;
-
-  // var pagePadding = 20;
-
   var pagePaddingX = w * 0.02;
   var pagePaddingY = h * 0.02;
-
   var pagePaddedWidth = w - (pagePaddingX * 2);
   var pagePaddedHeight = h - (pagePaddingY * 2);
-
   var cellDim = Math.min(pagePaddedWidth / 3, pagePaddedHeight / 2);
-
   var cellPadding = cellDim * 0.02;
-
   var cellPaddedDim = cellDim - (cellPadding * 2);
-
   var gridWidth = cellDim * 3;
   var gridHeight = cellDim * 2;
-
   var pageOriginX = (w / 2) - (gridWidth / 2);
   var pageOriginY = (h / 2) - (gridHeight / 2);
 
-  ctx.fillStyle = 'yellow';
+  ctx.fillStyle = 'lightgray';
   ctx.fillRect(0, 0, w, h);
 
   ctx.fillStyle = 'black';
@@ -167,12 +231,12 @@ var draw = () => {
   }
 
   if (opponent) {
-    drawFiles(opponent.f, col2PaddedOriginX, row1PaddedOriginY, cellPaddedDim);
+    drawFiles(false, col2PaddedOriginX, row1PaddedOriginY, cellPaddedDim);
     drawSailor(opponent, col3PaddedOriginX, row1PaddedOriginY, cellPaddedDim);
   }
 
   drawSailor(player, col1PaddedOriginX, row2PaddedOriginY, cellPaddedDim, true);
-  drawFiles(player.f, col2PaddedOriginX, row2PaddedOriginY, cellPaddedDim);
+  drawFiles(true, col2PaddedOriginX, row2PaddedOriginY, cellPaddedDim);
 
   // if (global_current_offer) {
   //   makeButton(50, 50, 100, 50, 'Accept');
@@ -189,20 +253,15 @@ var draw = () => {
   // });
 };
 
-
 var fi = (a, f) => a.find(f);
-
-
-// Change red pixels to tone.
-// Change green pixels to tone + 40
-// Change blue pixels to tone - 40
-
 
 // c: color [r, g, b]
 // d: +/- for tones
+// Change red pixels to tone.
+// Change green pixels to tone + 40
+// Change blue pixels to tone - 40
 // cw: (hidden) canvas width
 // ch: (hidden) canvas height
-
 // dx: draw x (on visible canvas)
 // dy: draw y (on visible canvas)
 // dw: draw width (on visible canvas)
@@ -253,13 +312,11 @@ var drawObject = (g, cw, ch, dx, dy, dw, c, d, mirror) => {
   for (var b = 0; b < buffer.length; b++)
     image.data[b] = buffer[b];
 
-
-
   // Redraw the buffer with the pixellated image.
   offctx.clearRect(0, 0, cw, ch);
   offctx.putImageData(image, 0, 0);
 
-  var dh = dw / cw * ch;
+  var dh = calcDrawHeight(cw, ch, dw);
 
   // Now copy the buffer into the visible canvas in a beautiful, pixelly way.
   ctx.imageSmoothingEnabled = false;
@@ -268,6 +325,11 @@ var drawObject = (g, cw, ch, dx, dy, dw, c, d, mirror) => {
 
   return dh;
 };
+
+// cw: buffer width
+// ch: buffer height
+// dw: draw width
+var calcDrawHeight = (cw, ch, dw) => dw / cw * ch;
 
 var R = '#f00';
 var G = '#0f0';
@@ -435,7 +497,6 @@ var newGame = () => {
 };
 
 var newOpponent = () => {
-  showSailor(player);
   opponent = makeSailor(true, 3, makeName());
   generateOffer();
 }
@@ -694,8 +755,6 @@ var generateOffer = () => {
 
   var lowTransactions = findLowValueTransaction(opponent, player, highTransaction.v);
 
-  console.debug('lowTransactions', lowTransactions);
-
   if (lowTransactions.length == 0) {
     console.warn(`${opponent.n} has nothing of value to you.`);
     newOpponent();
@@ -724,6 +783,5 @@ canvas.addEventListener('click', onClick);
 
 window.addEventListener('resize', draw, true);
 window.addEventListener('orientationchange', draw, true);
-
 
 newGame();
