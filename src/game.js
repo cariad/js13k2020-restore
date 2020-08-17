@@ -238,19 +238,16 @@ var draw = () => {
   drawSailor(player, col1PaddedOriginX, row2PaddedOriginY, cellPaddedDim, true);
   drawFiles(true, col2PaddedOriginX, row2PaddedOriginY, cellPaddedDim);
 
-  // if (global_current_offer) {
-  //   makeButton(50, 50, 100, 50, 'Accept');
-  //   makeButton(200, 50, 100, 50, 'Counter');
-  // }
-
-  // ctx.font = 'bold 22px cursive';
-  // ctx.textAlign = "center";
-  // ctx.textBaseline = "middle";
-  // ctx.fillStyle = '#000';
-  // fe(buttons, b => {
-  //   ctx.fillText(b.t, b.x + (b.w / 2), b.y + (b.h / 2), b.w, b.h);
-  //   ctx.strokeRect(b.x, b.y, b.w, b.h);
-  // });
+  if (global_current_offer) {
+    ctx.font = 'bold 22px cursive';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = '#000';
+    var buttonHeight = 40;
+    ctx.fillText('Accept', col3PaddedOriginX + (cellPaddedDim / 2), row2PaddedOriginY + (buttonHeight / 2), cellPaddedDim, buttonHeight);
+    ctx.strokeRect(col3PaddedOriginX, row2PaddedOriginY, cellPaddedDim, buttonHeight);
+    addHitBox(col3PaddedOriginX, row2PaddedOriginY, cellPaddedDim, buttonHeight, 'Accept');
+  }
 };
 
 var fi = (a, f) => a.find(f);
@@ -440,19 +437,12 @@ var drawRectangle = (cc, x, y, width, height, radius) => {
 
 var onClick = (e) => {
   var x = e.offsetX, y = e.offsetY;
-  var button = buttons.reverse().find(i => i.x < x && x < i.xa && i.y < y && y < i.ya);
-  if (!button) {
-    console.log('missed', x, y);
-    return;
-  }
-
-  console.log('hit', x, y);
+  var button = buttons.reverse().find(i => i.x < x && x < i.x + i.w && i.y < y && y < i.y + i.h);
+  if (!button) return;
 
   if (button.t == 'Accept') {
-    buttons = [];
     acceptOffer();
   } else if (button.t == 'Again') {
-    buttons = [];
     newGame();
   }
   else {
@@ -460,9 +450,7 @@ var onClick = (e) => {
   }
 };
 
-var makeButton = (x, y, w, h, t) => {
-  buttons.push({ x: x, y: y, xa: x + w, ya: y + h, t: t, w: w, h: h });
-};
+var addHitBox = (x, y, w, h, t) => buttons.push({x:x, y:y, w:w, h:h, t:t});
 
 // Thank you, David Braben!
 var SEED_LEFT = new Date().getMinutes(), SEED_RIGHT = new Date().getSeconds();
@@ -714,18 +702,18 @@ var acceptOffer = _ => {
     global_winner = player;
     console.warn(`You won! :)`);
     showSailor(player);
-    makeButton(50, 50, 100, 50, 'Again');
+    // makeButton(50, 50, 100, 50, 'Again');
   } else if (playerWon) {
     global_winner = player;
     console.warn(`You won! :)`);
     showSailor(player);
-    makeButton(50, 50, 100, 50, 'Again');
+    // makeButton(50, 50, 100, 50, 'Again');
   }
   else if (opponentWon) {
     global_winner = opponent;
     console.warn(`${opponent.n} won! :(`);
     showSailor(opponent);
-    makeButton(50, 50, 100, 50, 'Again');
+    // makeButton(50, 50, 100, 50, 'Again');
   }
   else {
     console.info(`${opponent.n} walks away with:`);
