@@ -231,7 +231,8 @@ var drawFile = (layout, w) => {
   var pc = ms > 500 ? 0 : (500 - ms % 500) / 500;
 
   for (var i = 0; i < CHUNKS_PER_FILE; i++) {
-    ctx.fillStyle = layout.c[i].g ? '#0f0' : '#666';
+    var onOff = layout.c[i].h ? ['#ff0', '#660'] : ['#0f0', '#666'];
+    ctx.fillStyle = layout.c[i].g ? onOff[0] : onOff[1];
     ctx.fillRect(layout.c[i].x, layout.c[i].y, layout.cw, layout.cw);
 
     var arrowIndent = (layout.cw - arrowDim) / 2;
@@ -744,18 +745,11 @@ var logTransaction = t => console.debug(`> "${toBinary(t.b)}" of file (${t.i}) w
 var applyTransaction = (s, t) => {
   if (g = s.f.find(h => h.i == t.i)) g.b += t.b; else {
     s.f.push({
-
-
-
       m: 1,
       b: t.b,
       // Don't allow 0, that's special.
       i: t.i,
-
-
-
-
-    })
+    });
   }
 };
 
@@ -802,14 +796,6 @@ var acceptOffer = _ => {
   }
 };
 
-var logOffer = o => {
-  console.info(`There's an offer on the table!`);
-  console.info(`${opponent.n} will take:`);
-  fe(o.o, t => logTransaction(t));
-  console.info(`In return, ${opponent.n} will offer:`);
-  fe(o.p, t => logTransaction(t));
-}
-
 var generateOffer = () => {
   var highTransaction = findHighValueTransction(player, opponent);
 
@@ -834,14 +820,31 @@ var generateOffer = () => {
     p: lowTransactions
   };
 
-  logOffer(global_current_offer);
-
   // TODO: If the lowTransactions are < 80% of the highTransactions then the
   //       opponent should feel bad and recalcuate the highTransaction to no
   //       more than 80% over the lowTransaction.
-}
+};
+
+var onMouseMove = (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  var x = e.offsetX, y = e.offsetY, found;
+
+  global_layout.p.forEach(fileLayout => {
+    fileLayout.c.forEach(chunk => {
+      chunk.h = ( chunk.x < x && x < chunk.x + fileLayout.cw && chunk.y < y && y < chunk.y + fileLayout.cw);
+      if(chunk.h) {
+        found=1;
+        canvas.style.cursor = "pointer";
+      }
+    });
+  });
+
+  if(!found)canvas.style.cursor = "default";
+};
 
 canvas.addEventListener('click', onClick);
+canvas.addEventListener('mousemove', onMouseMove);
 window.addEventListener('resize', recalcLayout, true);
 window.addEventListener('orientationchange', recalcLayout, true);
 
