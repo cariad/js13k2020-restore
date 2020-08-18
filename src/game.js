@@ -35,44 +35,183 @@ var makeName = _ => {
 
 // p: player files
 // o: opponent files
-var global_layout = {p: [], p:[]};
+var global_layout = { p: [], o: [] };
 
 var recalcLayout = () => {
+  var w = canvas.width = window.innerWidth;
+  var h = canvas.height = window.innerHeight;
 
-};
+  var pagePaddingX = w * 0.1;
+  var pagePaddingY = h * 0.02;
+  var pagePaddedWidth = w - (pagePaddingX * 2);
+  var pagePaddedHeight = h - (pagePaddingY * 2);
 
-var recalcLayoutFiles = () => {
+  var columns = 4, rows = 2;
 
-};
+  var cellDim = Math.min(pagePaddedWidth / columns, pagePaddedHeight / rows);
+  var cellPadding = cellDim * 0.02;
+  var cellPaddedDim = cellDim - (cellPadding * 2);
 
+  var gridWidth = cellDim * columns;
+  var gridHeight = cellDim * rows;
 
-var drawFiles = (forPlayer, x, y, w) => {
-  var nextY = y;
-  var gap = 9;
+  var pageOriginX = (w / 2) - (gridWidth / 2);
+  var pageOriginY = (h / 2) - (gridHeight / 2);
 
-  var files = forPlayer ? player.f : opponent.f;
+  var columnPaddedOrigin = [], rowPaddedOrigins = []
 
-  for (var i = 0; i < files.length; i++) {
-    nextY = gap + drawFile(forPlayer, files[i], x, nextY, w);
+  for (var row = 0; row < rows; row++) rowPaddedOrigins.push(pageOriginY + cellPadding + (row * (cellDim + cellPadding)))
+  for (var col = 0; col < columns; col++) columnPaddedOrigin.push(pageOriginX + cellPadding + (col * (cellDim + cellPadding)))
+
+  // a: arrows
+  global_layout = {
+    w: window.innerWidth,
+    h: window.innerHeight,
+    p: getCalculatedFilesLayout(true, columnPaddedOrigin[1], rowPaddedOrigins[0], cellPaddedDim),
+    o: getCalculatedFilesLayout(false, columnPaddedOrigin[2], rowPaddedOrigins[0], cellPaddedDim),
+    a: {
+      // w: vColumnWidth * vArrowDim
+    }
+  };
+
+  var pagePaddingX = w * 0.02;
+  var pagePaddingY = h * 0.02;
+  var pagePaddedWidth = w - (pagePaddingX * 2);
+  var pagePaddedHeight = h - (pagePaddingY * 2);
+
+  var columns = 4, rows = 2;
+
+  var cellDim = Math.min(pagePaddedWidth / columns, pagePaddedHeight / rows);
+  var cellPadding = cellDim * 0.02;
+
+  // cpd = cell Padded Dim
+  global_layout.cpd = cellPaddedDim;
+
+  // pa: player avatar
+  global_layout.pa = {};
+  global_layout.pa.x = columnPaddedOrigin[0];
+  global_layout.pa.y = rowPaddedOrigins[0];
+
+  // oa: opponent avatar
+  global_layout.oa = {};
+  global_layout.oa.x = columnPaddedOrigin[3];
+  global_layout.oa.y = rowPaddedOrigins[0];
+
+  global_layout.buttons = [];
+
+  if (global_current_offer) {
+    global_layout.buttons.push({
+      x: columnPaddedOrigin[3],
+      y: rowPaddedOrigins[1],
+      w: global_layout.cpd,
+      h: 40,
+      t: 'Accept!'
+    });
   }
-}
+};
 
-var drawFile = (forPlayer, file, x, y, w) => {
+var getCalculatedFilesLayout = (forPlayer, x, y, w) => {
+  var files = forPlayer ? player.f : opponent.f, nextY = y;
+  return files.map(fi => {
+    var fileLayout = getCalculatedFileLayout(forPlayer, fi, x, nextY, w);
+    nextY += fileLayout.h * 2;
+    return fileLayout
+  });
+};
 
-  ctx.fillStyle = 'black';
-  ctx.font = 'bold 16px monospace';
-  ctx.textAlign = "left";
-  ctx.fillText(file.i, x, y);
+var getCalculatedFileLayout = (forPlayer, file, x, y, w) => {
+  var layout = {
+    l: {
+      t: file.i,
+      x: x,
+      y: y,
+    }
+  };
 
   y += 20;
 
-  var thisGive, thisReceive, now = new Date();
+  var thisGive = (global_current_offer && forPlayer) ? global_current_offer.o.find(h => h.i == file.i) : null;
+  var thisReceive = (global_current_offer && forPlayer) ? global_current_offer.p.find(h => h.i == file.i) : null;
 
-  // Each gap is 10% of a block size.
-  // So, for each block, we need:
-  //  10x for block
-  //   1x for gap
-  // ...+ 1x final gap at the end.
+  // Virtual widths
+  var vBlockDim = 10;
+  var vGapDim = 1;
+
+  var vColumnCount = (CHUNKS_PER_FILE * (vBlockDim + vGapDim)) + vGapDim;
+  var vColumnWidth = w / vColumnCount;
+
+  // Actual widths
+  var blockDim = vColumnWidth * vBlockDim;
+  var gapDim = vColumnWidth * vGapDim;
+
+  var fileHeight = blockDim + (blockDim * 2 / 9);
+
+  // TODO: Handle receiving chunks for a file we haven't started yet.
+
+  layout.x = x;
+  layout.y = y;
+  layout.w = w;
+  layout.h = fileHeight;
+  // c: chunks
+  layout.c = [];
+  // cw: chunk width
+  layout.cw = blockDim;
+
+  for (var i = 0; i < CHUNKS_PER_FILE; i++) {
+    layout.c[i] = {};
+    var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
+    // g: got
+    layout.c[i].g = (file.b & thisPow) == thisPow;
+    layout.c[i].x = x + vColumnWidth + (i * (blockDim + gapDim));
+    layout.c[i].y = y + gapDim;
+    // to: transfer out
+    layout.c[i].to = (thisGive && (thisGive.b & thisPow) == thisPow);
+    // ti: transfer in
+    layout.c[i].ti = (thisReceive && (thisReceive.b & thisPow) == thisPow);
+
+    // h: highlight (mouse over)
+    layout.c[i].h = 0;
+  }
+
+  return layout;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+var drawFiles = (forPlayer, w) => {
+  var files = forPlayer ? player.f : opponent.f;
+  var layout = forPlayer ? global_layout.p : global_layout.o;
+
+  for (var i = 0; i < files.length; i++) {
+    drawFile(layout[i], w);
+  }
+}
+
+var drawFile = (layout, w) => {
+  ctx.fillStyle = 'black';
+  ctx.font = 'bold 16px monospace';
+  ctx.textAlign = "left";
+  ctx.fillText(layout.l.t, layout.l.x, layout.l.y);
+
+  var now = new Date();
 
   // Virtual widths
   var vArrowDim = 8;
@@ -84,41 +223,24 @@ var drawFile = (forPlayer, file, x, y, w) => {
 
   // Actual widths
   var arrowDim = vColumnWidth * vArrowDim;
-  var blockDim = vColumnWidth * vBlockDim;
-  var gapDim = vColumnWidth * vGapDim;
 
-  var fileHeight = blockDim + (blockDim * 2 / 9);
-
-  if (global_current_offer && forPlayer) {
-    thisReceive = global_current_offer.p.find(h => h.i == file.i);
-    thisGive = global_current_offer.o.find(h => h.i == file.i);
-  }
-
-  // TODO: Handle receiving chunks for a file we haven't started yet.
-
-  // Background
   ctx.fillStyle = 'black';
-  ctx.fillRect(x, y, w, fileHeight);
+  ctx.fillRect(layout.x, layout.y, layout.w, layout.h);
 
   var ms = now.getMilliseconds();
   var pc = ms > 500 ? 0 : (500 - ms % 500) / 500;
 
-  // Chunks
   for (var i = 0; i < CHUNKS_PER_FILE; i++) {
-    var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
-    ctx.fillStyle = (file.b & thisPow) == thisPow ? '#0f0' : '#666';
+    ctx.fillStyle = layout.c[i].g ? '#0f0' : '#666';
+    ctx.fillRect(layout.c[i].x, layout.c[i].y, layout.cw, layout.cw);
 
-    var blockX = x + vColumnWidth + (i * (blockDim + gapDim));
-
-    ctx.fillRect(blockX, y + gapDim, blockDim, blockDim);
-
-    var arrowIndent = (blockDim - arrowDim) / 2;
-    var arrowX = blockX + arrowIndent;
-    var maxTravel = blockDim * 0.4;
+    var arrowIndent = (layout.cw - arrowDim) / 2;
+    var arrowX = layout.c[i].x + arrowIndent;
+    var maxTravel = layout.cw * 0.4;
     var fourth = arrowDim / 4;
 
-    if (thisGive && (thisGive.b & thisPow) == thisPow) {
-      var arrowY = (y + (blockDim / 6)) - (maxTravel * 0.75) + (maxTravel * pc);
+    if (layout.c[i].to) {
+      var arrowY = (layout.c[i].y + (layout.cw / 6)) - (maxTravel * 0.75) + (maxTravel * pc);
 
       ctx.beginPath();
       ctx.moveTo(arrowX, arrowY);
@@ -128,11 +250,11 @@ var drawFile = (forPlayer, file, x, y, w) => {
 
       ctx.fillStyle = '#f00';
       ctx.fill();
-      ctx.fillRect(arrowX + fourth, arrowY, arrowDim - (2*fourth), arrowDim / 2);
+      ctx.fillRect(arrowX + fourth, arrowY, arrowDim - (2 * fourth), arrowDim / 2);
     }
 
-    if (thisReceive && (thisReceive.b & thisPow) == thisPow) {
-      var arrowY = (y + (blockDim / 6)) - (maxTravel * 0.75) + (maxTravel * (1-pc));
+    if (layout.c[i].ti) {
+      var arrowY = (layout.c[i].y + (layout.cw / 6)) - (maxTravel * 0.75) + (maxTravel * (1 - pc));
 
       ctx.beginPath();
       ctx.moveTo(arrowX, arrowY);
@@ -142,22 +264,18 @@ var drawFile = (forPlayer, file, x, y, w) => {
 
       ctx.fillStyle = '#00f';
       ctx.fill();
-      ctx.fillRect(arrowX + fourth, arrowY - (arrowDim / 2), arrowDim - (2*fourth), arrowDim / 2);
+      ctx.fillRect(arrowX + fourth, arrowY - (arrowDim / 2), arrowDim - (2 * fourth), arrowDim / 2);
     }
   }
-
-
-
-
-
-
-  return y + fileHeight + 5;
 };
 
 
 var draw = () => {
-  var w = canvas.width = window.innerWidth;
-  var h = canvas.height = window.innerHeight;
+  canvas.width = global_layout.w;
+  canvas.height = global_layout.h;
+
+  var w = window.innerWidth;
+  var h = window.innerHeight;
 
   var pagePaddingX = w * 0.02;
   var pagePaddingY = h * 0.02;
@@ -168,7 +286,6 @@ var draw = () => {
 
   var cellDim = Math.min(pagePaddedWidth / columns, pagePaddedHeight / rows);
   var cellPadding = cellDim * 0.02;
-  var cellPaddedDim = cellDim - (cellPadding * 2);
 
   var gridWidth = cellDim * columns;
   var gridHeight = cellDim * rows;
@@ -190,69 +307,25 @@ var draw = () => {
   for (var row = 0; row < rows; row++) rowPaddedOrigins.push(pageOriginY + cellPadding + (row * (cellDim + cellPadding)))
   for (var col = 0; col < columns; col++) columnPaddedOrigin.push(pageOriginX + cellPadding + (col * (cellDim + cellPadding)))
 
-  if (true) {
-    ctx.strokeStyle = 'red';
-    ctx.strokeRect(
-      columnPaddedOrigin[0],
-      rowPaddedOrigins[0],
-      cellPaddedDim, cellPaddedDim
-    );
-    ctx.strokeRect(
-      columnPaddedOrigin[1],
-      rowPaddedOrigins[0],
-      cellPaddedDim, cellPaddedDim
-    );
-    ctx.strokeRect(
-      columnPaddedOrigin[2],
-      rowPaddedOrigins[0],
-      cellPaddedDim, cellPaddedDim
-    );
-    ctx.strokeRect(
-      columnPaddedOrigin[3],
-      rowPaddedOrigins[0],
-      cellPaddedDim, cellPaddedDim
-    );
-    ctx.strokeRect(
-      columnPaddedOrigin[0],
-      rowPaddedOrigins[1],
-      cellPaddedDim, cellPaddedDim
-    );
-    ctx.strokeRect(
-      columnPaddedOrigin[1],
-      rowPaddedOrigins[1],
-      cellPaddedDim, cellPaddedDim
-    );
-    ctx.strokeRect(
-      columnPaddedOrigin[2],
-      rowPaddedOrigins[1],
-      cellPaddedDim, cellPaddedDim
-    );
-    ctx.strokeRect(
-      columnPaddedOrigin[3],
-      rowPaddedOrigins[1],
-      cellPaddedDim, cellPaddedDim
-    );
-  }
-
   if (player) {
-    drawSailor(player, columnPaddedOrigin[0], rowPaddedOrigins[0], cellPaddedDim, true);
-    drawFiles(true, columnPaddedOrigin[1], rowPaddedOrigins[0], cellPaddedDim);
+    drawSailor(player, global_layout.pa.x, global_layout.pa.y, global_layout.cpd, true);
+    drawFiles(true, global_layout.cpd);
   }
 
   if (opponent) {
-    drawSailor(opponent, columnPaddedOrigin[3], rowPaddedOrigins[0], cellPaddedDim, false);
-    drawFiles(false, columnPaddedOrigin[2], rowPaddedOrigins[0], cellPaddedDim);
+    drawSailor(opponent, global_layout.oa.x, global_layout.oa.y, global_layout.cpd, false);
+    drawFiles(false, global_layout.cpd);
   }
 
-  if (global_current_offer) {
-    ctx.font = 'bold 22px cursive';
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = '#000';
-    var buttonHeight = 40;
-    ctx.fillText('Accept', columnPaddedOrigin[3] + (cellPaddedDim / 2), rowPaddedOrigins[1] + (buttonHeight / 2), cellPaddedDim, buttonHeight);
-    ctx.strokeRect(columnPaddedOrigin[3], rowPaddedOrigins[1], cellPaddedDim, buttonHeight);
-  }
+  ctx.font = 'bold 22px cursive';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = '#000';
+
+  global_layout.buttons.forEach(b => {
+    ctx.fillText(b.t, b.x + (global_layout.cpd / 2), b.y + (b.h / 2), b.w, b.h);
+    ctx.strokeRect(b.x, b.y, global_layout.cpd, b.h);
+  })
 
   setTimeout(() => requestAnimationFrame(draw), 1000 / 60);
 };
@@ -760,8 +833,6 @@ var generateOffer = () => {
     // p: apply to player
     p: lowTransactions
   };
-
-  // addHitBox(columnPaddedOrigin[3], rowPaddedOrigins[1], cellPaddedDim, buttonHeight, 'Accept');
 
   logOffer(global_current_offer);
 
