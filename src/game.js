@@ -36,7 +36,8 @@ var makeName = _ => {
 
 var baseFileWidth = CHUNKS_PER_FILE * 10 + 1;
 
-var drawFiles = (forPlayer, x, y, w) => {
+var drawFiles = (forPlayer, x, y, w, h) => {
+
   var drawChunkSquare = w / baseFileWidth * 10;
 
   var nextY = y;
@@ -58,99 +59,125 @@ var drawFile = (forPlayer, file, x, y, w, drawChunkSquare) => {
 
   var thisGive, thisReceive;
 
+  // Each gap is 10% of a block size.
+  // So, for each block, we need:
+  //  10x for block
+  //   1x for gap
+  // ...+ 1x final gap at the end.
 
-  var fileAtY = y + 16;
-  var transAtY = fileAtY;
+  var vBlockDim = 10;
+  var vGapDim = 1;
 
-  var transBufferWidth = 10, transBufferHeight = 5;
+  var vColumnCount = (CHUNKS_PER_FILE * (vBlockDim + vGapDim)) + vGapDim;
+  var vColumnWidth = w / vColumnCount;
 
-  if (global_current_offer && forPlayer) {
+  console.log(w, vColumnCount);
 
-    thisReceive = global_current_offer.p.find(h => h.i == file.i);
-    thisGive = global_current_offer.o.find(h => h.i == file.i);
 
-    if (thisReceive || thisGive) {
-      var transactionHeight = calcDrawHeight(transBufferWidth, transBufferHeight, drawChunkSquare);
-      fileAtY += transactionHeight / 2;
-    }
+  var blockDim = vColumnWidth * vBlockDim;
+  var gapDim = vColumnWidth * vGapDim;
 
-  }
+
+  var fileHeight = blockDim + (blockDim * 1/9);
+
+  // var fileAtY = y + 16;
+  // var transAtY = fileAtY;
+
+  // var transBufferWidth = 10, transBufferHeight = 5;
+
+  // if (global_current_offer && forPlayer) {
+
+  //   thisReceive = global_current_offer.p.find(h => h.i == file.i);
+  //   thisGive = global_current_offer.o.find(h => h.i == file.i);
+
+  //   if (thisReceive || thisGive) {
+  //     var transactionHeight = calcDrawHeight(transBufferWidth, transBufferHeight, drawChunkSquare);
+  //     fileAtY += transactionHeight / 2;
+  //   }
+
+  // }
 
   // TODO: Handle receiving chunks for a file we haven't started yet.
 
-  var th = drawObject((offctx) => {
-    offctx.fillStyle = R;
-    offctx.fillRect(0, 0, 81, 10);
-  },
-    81, 10,         // buffer dimensions
-    x, fileAtY, w,  // x, y, width to draw on canvas
-    [0, 0, 0],      // color to paint reds as
-    0,              // color deviation for greens and blues
-  );
+
+  ctx.fillStyle = 'brown';
+  // ctx.fillRect(x, y, w, fileHeight);
+
+  ctx.fillStyle = 'white';
 
   for (var i = 0; i < CHUNKS_PER_FILE; i++) {
-    drawObject((offctx) => {
-      var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
-      offctx.fillStyle = (file.b & thisPow) == thisPow ? G : B;
-      offctx.fillRect(1, 1, 9, 8);
-    },
-      10, 10,                                             // buffer width
-      x + i * drawChunkSquare, fileAtY, drawChunkSquare,  // x, y, width to draw on canvas
-      [0, 255, 0],                                        // color to paint reds as
-      160,                                                // color deviation for greens and blues
-    );
+
+    ctx.fillRect(x + vColumnWidth + (i*(blockDim + gapDim)), y + gapDim, blockDim, blockDim);
+
+
+  //   drawObject((offctx) => {
+  //     var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
+  //     offctx.fillStyle = (file.b & thisPow) == thisPow ? G : B;
+  //     offctx.fillRect(1, 1, 9, 8);
+  //   },
+  //     10, 10,                                             // buffer width
+  //     x + i * drawChunkSquare, fileAtY, drawChunkSquare,  // x, y, width to draw on canvas
+  //     [0, 255, 0],                                        // color to paint reds as
+  //     160,                                                // color deviation for greens and blues
+  //   );
   }
 
-  if (thisGive)
-    for (var i = 0; i < CHUNKS_PER_FILE; i++) {
-      var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
-      if ((thisGive.b & thisPow) != thisPow) continue;
-      drawObject((offctx) => {
-        offctx.beginPath();
-        offctx.moveTo(1, 4);
-        offctx.lineTo(5, 0);
-        offctx.lineTo(6, 0);
-        offctx.lineTo(10, 4);
 
-        offctx.closePath();
+  ctx.strokeStyle = 'black';
+  for(var i=0; i < vColumnCount; i++) {
+    ctx.strokeRect(x + (i*vColumnWidth), y, vColumnWidth, 20);
+  }
 
-        offctx.fillStyle = R;
-        offctx.fill();
+  // if (thisGive)
+  //   for (var i = 0; i < CHUNKS_PER_FILE; i++) {
+  //     var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
+  //     if ((thisGive.b & thisPow) != thisPow) continue;
+  //     drawObject((offctx) => {
+  //       offctx.beginPath();
+  //       offctx.moveTo(1, 4);
+  //       offctx.lineTo(5, 0);
+  //       offctx.lineTo(6, 0);
+  //       offctx.lineTo(10, 4);
 
-        offctx.strokeStyle = B;
-        offctx.stroke();
-      },
-        transBufferWidth, transBufferHeight,                                              // buffer width
-        x + i * drawChunkSquare, transAtY, drawChunkSquare,  // x, y, width to draw on canvas
-        [255, 0, 0],                                         // color to paint reds as
-        180,                                                 // color deviation for greens and blues
-      );
-    }
+  //       offctx.closePath();
 
-  if (thisReceive)
-    for (var i = 0; i < CHUNKS_PER_FILE; i++) {
-      var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
-      if ((thisReceive.b & thisPow) != thisPow) continue;
-      drawObject((offctx) => {
-        offctx.beginPath();
-        offctx.moveTo(1, 0);
-        offctx.lineTo(5, 4);
-        offctx.lineTo(6, 4);
-        offctx.lineTo(10, 0);
-        offctx.closePath();
+  //       offctx.fillStyle = R;
+  //       offctx.fill();
 
-        offctx.fillStyle = R;
-        offctx.fill();
+  //       offctx.strokeStyle = B;
+  //       offctx.stroke();
+  //     },
+  //       transBufferWidth, transBufferHeight,                                              // buffer width
+  //       x + i * drawChunkSquare, transAtY, drawChunkSquare,  // x, y, width to draw on canvas
+  //       [255, 0, 0],                                         // color to paint reds as
+  //       180,                                                 // color deviation for greens and blues
+  //     );
+  //   }
 
-        offctx.strokeStyle = B;
-        offctx.stroke();
-      },
-        transBufferWidth, transBufferHeight,                                              // buffer width
-        x + i * drawChunkSquare, transAtY, drawChunkSquare,  // x, y, width to draw on canvas
-        [0, 0, 255],                                         // color to paint reds as
-        180,                                                 // color deviation for greens and blues
-      );
-    }
+  // if (thisReceive)
+  //   for (var i = 0; i < CHUNKS_PER_FILE; i++) {
+  //     var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
+  //     if ((thisReceive.b & thisPow) != thisPow) continue;
+  //     drawObject((offctx) => {
+  //       offctx.beginPath();
+  //       offctx.moveTo(1, 0);
+  //       offctx.lineTo(5, 4);
+  //       offctx.lineTo(6, 4);
+  //       offctx.lineTo(10, 0);
+  //       offctx.closePath();
+
+  //       offctx.fillStyle = R;
+  //       offctx.fill();
+
+  //       offctx.strokeStyle = B;
+  //       offctx.stroke();
+  //     },
+  //       transBufferWidth, transBufferHeight,                                              // buffer width
+  //       x + i * drawChunkSquare, transAtY, drawChunkSquare,  // x, y, width to draw on canvas
+  //       [0, 0, 255],                                         // color to paint reds as
+  //       180,                                                 // color deviation for greens and blues
+  //     );
+  //   }
 
 
 
@@ -158,22 +185,28 @@ var drawFile = (forPlayer, file, x, y, w, drawChunkSquare) => {
 
 
 
-  return fileAtY + th;
+  return y + 40;
 };
 
 
 var draw = () => {
   var w = canvas.width = window.innerWidth;
   var h = canvas.height = window.innerHeight;
+
   var pagePaddingX = w * 0.02;
   var pagePaddingY = h * 0.02;
   var pagePaddedWidth = w - (pagePaddingX * 2);
   var pagePaddedHeight = h - (pagePaddingY * 2);
-  var cellDim = Math.min(pagePaddedWidth / 3, pagePaddedHeight / 2);
+
+  var columns = 4, rows = 2;
+
+  var cellDim = Math.min(pagePaddedWidth / columns, pagePaddedHeight / rows);
   var cellPadding = cellDim * 0.02;
   var cellPaddedDim = cellDim - (cellPadding * 2);
-  var gridWidth = cellDim * 3;
-  var gridHeight = cellDim * 2;
+
+  var gridWidth = cellDim * columns;
+  var gridHeight = cellDim * rows;
+
   var pageOriginX = (w / 2) - (gridWidth / 2);
   var pageOriginY = (h / 2) - (gridHeight / 2);
 
@@ -186,57 +219,64 @@ var draw = () => {
   ctx.textBaseline = "top";
   ctx.fillText(`${w} x ${h}`, 0, 0);
 
-  var row1PaddedOriginY = pageOriginY + cellPadding;
-  var row2PaddedOriginY = pageOriginY + cellDim + cellPadding;
+  var columnPaddedOrigin = [], rowPaddedOrigins = []
 
-  var col1PaddedOriginX = pageOriginX + cellPadding;
-  var col2PaddedOriginX = pageOriginX + cellDim + cellPadding;
-  var col3PaddedOriginX = pageOriginX + cellDim + cellDim + cellPadding;
+  for(var row = 0; row < rows; row++) rowPaddedOrigins.push(pageOriginY + cellPadding + (row*(cellDim + cellPadding)))
+  for(var col = 0; col < columns; col++) columnPaddedOrigin.push(pageOriginX + cellPadding + (col*(cellDim + cellPadding)))
 
-  if (false) {
+  if (true) {
     ctx.strokeStyle = 'red';
     ctx.strokeRect(
-      col1PaddedOriginX,
-      row1PaddedOriginY,
+      columnPaddedOrigin[0],
+      rowPaddedOrigins[0],
       cellPaddedDim, cellPaddedDim
     );
     ctx.strokeRect(
-      col2PaddedOriginX,
-      row1PaddedOriginY,
+      columnPaddedOrigin[1],
+      rowPaddedOrigins[0],
       cellPaddedDim, cellPaddedDim
     );
     ctx.strokeRect(
-      col3PaddedOriginX,
-      row1PaddedOriginY,
+      columnPaddedOrigin[2],
+      rowPaddedOrigins[0],
       cellPaddedDim, cellPaddedDim
     );
     ctx.strokeRect(
-      col1PaddedOriginX,
-      row2PaddedOriginY,
-      cellPaddedDim,
-      cellPaddedDim
+      columnPaddedOrigin[3],
+      rowPaddedOrigins[0],
+      cellPaddedDim, cellPaddedDim
     );
     ctx.strokeRect(
-      col2PaddedOriginX,
-      row2PaddedOriginY,
-      cellPaddedDim,
-      cellPaddedDim
+      columnPaddedOrigin[0],
+      rowPaddedOrigins[1],
+      cellPaddedDim, cellPaddedDim
     );
     ctx.strokeRect(
-      col3PaddedOriginX,
-      row2PaddedOriginY,
-      cellPaddedDim,
-      cellPaddedDim
+      columnPaddedOrigin[1],
+      rowPaddedOrigins[1],
+      cellPaddedDim, cellPaddedDim
     );
+    ctx.strokeRect(
+      columnPaddedOrigin[2],
+      rowPaddedOrigins[1],
+      cellPaddedDim, cellPaddedDim
+    );
+    ctx.strokeRect(
+      columnPaddedOrigin[3],
+      rowPaddedOrigins[1],
+      cellPaddedDim, cellPaddedDim
+    );
+  }
+
+  if (player) {
+    drawSailor(player, columnPaddedOrigin[0], rowPaddedOrigins[0], cellPaddedDim, true);
+    drawFiles(true, columnPaddedOrigin[1], rowPaddedOrigins[0], cellPaddedDim, cellPaddedDim + cellPadding + cellPaddedDim);
   }
 
   if (opponent) {
-    drawFiles(false, col2PaddedOriginX, row1PaddedOriginY, cellPaddedDim);
-    drawSailor(opponent, col3PaddedOriginX, row1PaddedOriginY, cellPaddedDim);
+    drawSailor(opponent, columnPaddedOrigin[3], rowPaddedOrigins[0], cellPaddedDim, false);
+    drawFiles(false, columnPaddedOrigin[2], rowPaddedOrigins[0], cellPaddedDim, cellPaddedDim + cellPadding + cellPaddedDim);
   }
-
-  drawSailor(player, col1PaddedOriginX, row2PaddedOriginY, cellPaddedDim, true);
-  drawFiles(true, col2PaddedOriginX, row2PaddedOriginY, cellPaddedDim);
 
   if (global_current_offer) {
     ctx.font = 'bold 22px cursive';
@@ -244,9 +284,9 @@ var draw = () => {
     ctx.textBaseline = "middle";
     ctx.fillStyle = '#000';
     var buttonHeight = 40;
-    ctx.fillText('Accept', col3PaddedOriginX + (cellPaddedDim / 2), row2PaddedOriginY + (buttonHeight / 2), cellPaddedDim, buttonHeight);
-    ctx.strokeRect(col3PaddedOriginX, row2PaddedOriginY, cellPaddedDim, buttonHeight);
-    addHitBox(col3PaddedOriginX, row2PaddedOriginY, cellPaddedDim, buttonHeight, 'Accept');
+    ctx.fillText('Accept', columnPaddedOrigin[3] + (cellPaddedDim / 2), rowPaddedOrigins[1] + (buttonHeight / 2), cellPaddedDim, buttonHeight);
+    ctx.strokeRect(columnPaddedOrigin[3], rowPaddedOrigins[1], cellPaddedDim, buttonHeight);
+    addHitBox(columnPaddedOrigin[3], rowPaddedOrigins[1], cellPaddedDim, buttonHeight, 'Accept');
   }
 };
 
@@ -450,7 +490,7 @@ var onClick = (e) => {
   }
 };
 
-var addHitBox = (x, y, w, h, t) => buttons.push({x:x, y:y, w:w, h:h, t:t});
+var addHitBox = (x, y, w, h, t) => buttons.push({ x: x, y: y, w: w, h: h, t: t });
 
 // Thank you, David Braben!
 var SEED_LEFT = new Date().getMinutes(), SEED_RIGHT = new Date().getSeconds();
