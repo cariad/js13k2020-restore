@@ -33,31 +33,40 @@ var makeName = _ => {
   return x.join(' ');
 };
 
+// p: player files
+// o: opponent files
+var global_layout = {p: [], p:[]};
 
-var baseFileWidth = CHUNKS_PER_FILE * 10 + 1;
+var recalcLayout = () => {
 
-var drawFiles = (forPlayer, x, y, w, h) => {
+};
 
-  var drawChunkSquare = w / baseFileWidth * 10;
+var recalcLayoutFiles = () => {
 
+};
+
+
+var drawFiles = (forPlayer, x, y, w) => {
   var nextY = y;
   var gap = 9;
 
   var files = forPlayer ? player.f : opponent.f;
 
   for (var i = 0; i < files.length; i++) {
-    nextY = gap + drawFile(forPlayer, files[i], x, nextY, w, drawChunkSquare);
+    nextY = gap + drawFile(forPlayer, files[i], x, nextY, w);
   }
 }
 
-var drawFile = (forPlayer, file, x, y, w, drawChunkSquare) => {
+var drawFile = (forPlayer, file, x, y, w) => {
 
   ctx.fillStyle = 'black';
   ctx.font = 'bold 16px monospace';
   ctx.textAlign = "left";
   ctx.fillText(file.i, x, y);
 
-  var thisGive, thisReceive;
+  y += 20;
+
+  var thisGive, thisReceive, now = new Date();
 
   // Each gap is 10% of a block size.
   // So, for each block, we need:
@@ -65,127 +74,84 @@ var drawFile = (forPlayer, file, x, y, w, drawChunkSquare) => {
   //   1x for gap
   // ...+ 1x final gap at the end.
 
+  // Virtual widths
+  var vArrowDim = 8;
   var vBlockDim = 10;
   var vGapDim = 1;
 
   var vColumnCount = (CHUNKS_PER_FILE * (vBlockDim + vGapDim)) + vGapDim;
   var vColumnWidth = w / vColumnCount;
 
-  console.log(w, vColumnCount);
-
-
+  // Actual widths
+  var arrowDim = vColumnWidth * vArrowDim;
   var blockDim = vColumnWidth * vBlockDim;
   var gapDim = vColumnWidth * vGapDim;
 
+  var fileHeight = blockDim + (blockDim * 2 / 9);
 
-  var fileHeight = blockDim + (blockDim * 1/9);
-
-  // var fileAtY = y + 16;
-  // var transAtY = fileAtY;
-
-  // var transBufferWidth = 10, transBufferHeight = 5;
-
-  // if (global_current_offer && forPlayer) {
-
-  //   thisReceive = global_current_offer.p.find(h => h.i == file.i);
-  //   thisGive = global_current_offer.o.find(h => h.i == file.i);
-
-  //   if (thisReceive || thisGive) {
-  //     var transactionHeight = calcDrawHeight(transBufferWidth, transBufferHeight, drawChunkSquare);
-  //     fileAtY += transactionHeight / 2;
-  //   }
-
-  // }
+  if (global_current_offer && forPlayer) {
+    thisReceive = global_current_offer.p.find(h => h.i == file.i);
+    thisGive = global_current_offer.o.find(h => h.i == file.i);
+  }
 
   // TODO: Handle receiving chunks for a file we haven't started yet.
 
+  // Background
+  ctx.fillStyle = 'black';
+  ctx.fillRect(x, y, w, fileHeight);
 
-  ctx.fillStyle = 'brown';
-  // ctx.fillRect(x, y, w, fileHeight);
+  var ms = now.getMilliseconds();
+  var pc = ms > 500 ? 0 : (500 - ms % 500) / 500;
 
-  ctx.fillStyle = 'white';
-
+  // Chunks
   for (var i = 0; i < CHUNKS_PER_FILE; i++) {
+    var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
+    ctx.fillStyle = (file.b & thisPow) == thisPow ? '#0f0' : '#666';
 
-    ctx.fillRect(x + vColumnWidth + (i*(blockDim + gapDim)), y + gapDim, blockDim, blockDim);
+    var blockX = x + vColumnWidth + (i * (blockDim + gapDim));
 
+    ctx.fillRect(blockX, y + gapDim, blockDim, blockDim);
 
-  //   drawObject((offctx) => {
-  //     var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
-  //     offctx.fillStyle = (file.b & thisPow) == thisPow ? G : B;
-  //     offctx.fillRect(1, 1, 9, 8);
-  //   },
-  //     10, 10,                                             // buffer width
-  //     x + i * drawChunkSquare, fileAtY, drawChunkSquare,  // x, y, width to draw on canvas
-  //     [0, 255, 0],                                        // color to paint reds as
-  //     160,                                                // color deviation for greens and blues
-  //   );
+    var arrowIndent = (blockDim - arrowDim) / 2;
+    var arrowX = blockX + arrowIndent;
+    var maxTravel = blockDim * 0.4;
+    var fourth = arrowDim / 4;
+
+    if (thisGive && (thisGive.b & thisPow) == thisPow) {
+      var arrowY = (y + (blockDim / 6)) - (maxTravel * 0.75) + (maxTravel * pc);
+
+      ctx.beginPath();
+      ctx.moveTo(arrowX, arrowY);
+      ctx.lineTo(arrowX + arrowDim, arrowY);
+      ctx.lineTo(arrowX + (arrowDim / 2), arrowY - (arrowDim * 0.4));
+      ctx.closePath();
+
+      ctx.fillStyle = '#f00';
+      ctx.fill();
+      ctx.fillRect(arrowX + fourth, arrowY, arrowDim - (2*fourth), arrowDim / 2);
+    }
+
+    if (thisReceive && (thisReceive.b & thisPow) == thisPow) {
+      var arrowY = (y + (blockDim / 6)) - (maxTravel * 0.75) + (maxTravel * (1-pc));
+
+      ctx.beginPath();
+      ctx.moveTo(arrowX, arrowY);
+      ctx.lineTo(arrowX + arrowDim, arrowY);
+      ctx.lineTo(arrowX + (arrowDim / 2), arrowY + (arrowDim * 0.4));
+      ctx.closePath();
+
+      ctx.fillStyle = '#00f';
+      ctx.fill();
+      ctx.fillRect(arrowX + fourth, arrowY - (arrowDim / 2), arrowDim - (2*fourth), arrowDim / 2);
+    }
   }
 
 
-  ctx.strokeStyle = 'black';
-  for(var i=0; i < vColumnCount; i++) {
-    ctx.strokeRect(x + (i*vColumnWidth), y, vColumnWidth, 20);
-  }
-
-  // if (thisGive)
-  //   for (var i = 0; i < CHUNKS_PER_FILE; i++) {
-  //     var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
-  //     if ((thisGive.b & thisPow) != thisPow) continue;
-  //     drawObject((offctx) => {
-  //       offctx.beginPath();
-  //       offctx.moveTo(1, 4);
-  //       offctx.lineTo(5, 0);
-  //       offctx.lineTo(6, 0);
-  //       offctx.lineTo(10, 4);
-
-  //       offctx.closePath();
-
-  //       offctx.fillStyle = R;
-  //       offctx.fill();
-
-  //       offctx.strokeStyle = B;
-  //       offctx.stroke();
-  //     },
-  //       transBufferWidth, transBufferHeight,                                              // buffer width
-  //       x + i * drawChunkSquare, transAtY, drawChunkSquare,  // x, y, width to draw on canvas
-  //       [255, 0, 0],                                         // color to paint reds as
-  //       180,                                                 // color deviation for greens and blues
-  //     );
-  //   }
-
-  // if (thisReceive)
-  //   for (var i = 0; i < CHUNKS_PER_FILE; i++) {
-  //     var thisPow = Math.pow(2, CHUNKS_PER_FILE - i - 1);
-  //     if ((thisReceive.b & thisPow) != thisPow) continue;
-  //     drawObject((offctx) => {
-  //       offctx.beginPath();
-  //       offctx.moveTo(1, 0);
-  //       offctx.lineTo(5, 4);
-  //       offctx.lineTo(6, 4);
-  //       offctx.lineTo(10, 0);
-  //       offctx.closePath();
-
-  //       offctx.fillStyle = R;
-  //       offctx.fill();
-
-  //       offctx.strokeStyle = B;
-  //       offctx.stroke();
-  //     },
-  //       transBufferWidth, transBufferHeight,                                              // buffer width
-  //       x + i * drawChunkSquare, transAtY, drawChunkSquare,  // x, y, width to draw on canvas
-  //       [0, 0, 255],                                         // color to paint reds as
-  //       180,                                                 // color deviation for greens and blues
-  //     );
-  //   }
 
 
 
 
-
-
-
-  return y + 40;
+  return y + fileHeight + 5;
 };
 
 
@@ -221,8 +187,8 @@ var draw = () => {
 
   var columnPaddedOrigin = [], rowPaddedOrigins = []
 
-  for(var row = 0; row < rows; row++) rowPaddedOrigins.push(pageOriginY + cellPadding + (row*(cellDim + cellPadding)))
-  for(var col = 0; col < columns; col++) columnPaddedOrigin.push(pageOriginX + cellPadding + (col*(cellDim + cellPadding)))
+  for (var row = 0; row < rows; row++) rowPaddedOrigins.push(pageOriginY + cellPadding + (row * (cellDim + cellPadding)))
+  for (var col = 0; col < columns; col++) columnPaddedOrigin.push(pageOriginX + cellPadding + (col * (cellDim + cellPadding)))
 
   if (true) {
     ctx.strokeStyle = 'red';
@@ -270,12 +236,12 @@ var draw = () => {
 
   if (player) {
     drawSailor(player, columnPaddedOrigin[0], rowPaddedOrigins[0], cellPaddedDim, true);
-    drawFiles(true, columnPaddedOrigin[1], rowPaddedOrigins[0], cellPaddedDim, cellPaddedDim + cellPadding + cellPaddedDim);
+    drawFiles(true, columnPaddedOrigin[1], rowPaddedOrigins[0], cellPaddedDim);
   }
 
   if (opponent) {
     drawSailor(opponent, columnPaddedOrigin[3], rowPaddedOrigins[0], cellPaddedDim, false);
-    drawFiles(false, columnPaddedOrigin[2], rowPaddedOrigins[0], cellPaddedDim, cellPaddedDim + cellPadding + cellPaddedDim);
+    drawFiles(false, columnPaddedOrigin[2], rowPaddedOrigins[0], cellPaddedDim);
   }
 
   if (global_current_offer) {
@@ -286,8 +252,9 @@ var draw = () => {
     var buttonHeight = 40;
     ctx.fillText('Accept', columnPaddedOrigin[3] + (cellPaddedDim / 2), rowPaddedOrigins[1] + (buttonHeight / 2), cellPaddedDim, buttonHeight);
     ctx.strokeRect(columnPaddedOrigin[3], rowPaddedOrigins[1], cellPaddedDim, buttonHeight);
-    addHitBox(columnPaddedOrigin[3], rowPaddedOrigins[1], cellPaddedDim, buttonHeight, 'Accept');
   }
+
+  setTimeout(() => requestAnimationFrame(draw), 1000 / 60);
 };
 
 var fi = (a, f) => a.find(f);
@@ -760,8 +727,6 @@ var acceptOffer = _ => {
     showSailor(opponent);
     newOpponent();
   }
-
-  requestAnimationFrame(draw);
 };
 
 var logOffer = o => {
@@ -796,20 +761,20 @@ var generateOffer = () => {
     p: lowTransactions
   };
 
-  logOffer(global_current_offer);
+  // addHitBox(columnPaddedOrigin[3], rowPaddedOrigins[1], cellPaddedDim, buttonHeight, 'Accept');
 
-  requestAnimationFrame(draw);
+  logOffer(global_current_offer);
 
   // TODO: If the lowTransactions are < 80% of the highTransactions then the
   //       opponent should feel bad and recalcuate the highTransaction to no
   //       more than 80% over the lowTransaction.
-
 }
 
-
 canvas.addEventListener('click', onClick);
+window.addEventListener('resize', recalcLayout, true);
+window.addEventListener('orientationchange', recalcLayout, true);
 
-window.addEventListener('resize', draw, true);
-window.addEventListener('orientationchange', draw, true);
 
 newGame();
+recalcLayout();
+requestAnimationFrame(draw);
