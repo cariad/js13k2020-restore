@@ -106,12 +106,6 @@ var recalcLayout = () => {
         nextButtonY = addGlobalButtonLayout('Accept', columnPaddedOrigin[3], nextButtonY);
         nextButtonY = addGlobalButtonLayout('Counter', columnPaddedOrigin[3], nextButtonY);
     }
-
-    //     switch (global_mode): {
-    //         case: 1 {
-
-    // }
-    //     }
 };
 
 var addGlobalButtonLayout = (t, x, y) => {
@@ -147,8 +141,6 @@ var getCalculatedFileLayout = (forPlayer, file, x, y, w) => {
 
     y += 20;
 
-    // var thisGive = (global_current_offer && forPlayer) ? global_current_offer.o.find(h => h.i == file.i) : null;
-    // var thisReceive = (global_current_offer && forPlayer) ? global_current_offer.p.find(h => h.i == file.i) : null;
     var thisGive;
     var thisReceive;
 
@@ -159,8 +151,6 @@ var getCalculatedFileLayout = (forPlayer, file, x, y, w) => {
         thisGive = (global_current_offer) ? global_current_offer.p.find(h => h.i == file.i) : null;
         thisReceive = (global_current_offer) ? global_current_offer.o.find(h => h.i == file.i) : null;
     }
-
-
 
     // Virtual widths
     var vBlockDim = 10;
@@ -540,15 +530,7 @@ var onClick = (e) => {
             transaction.b += global_selected_chunk.b;
 
         recalcLayout();
-        //        global_current_offer = {
-        //         // o: apply to opponent
-        //         o: [highTransaction],
-        //         // p: apply to player
-        //         p: lowTransactions
-        //     };
-        // }
     }
-
 
     if (global_selection) {
         if (global_selection.t == 'Accept') acceptOffer();
@@ -591,11 +573,6 @@ var makePartial = () => [4, 0].reduce((acc, shift) => {
     acc += nextRandom(14) + 1;
     return acc <<= shift;
 }, 0);
-
-// var showSailor = (sailor) => {
-//     console.info(`${sailor.n} holds:`);
-//     fe(sailor.f, file => console.info(`> (file ID: ${file.i.toString().padStart(2, '0')}) ${toBinary(file.b)}`));
-// };
 
 var toBinary = (b) => b.toString(2).padStart(CHUNKS_PER_FILE, 0);
 
