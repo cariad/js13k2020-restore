@@ -100,13 +100,90 @@ var recalcLayout = () => {
     // b: buttons
     global_layout.b = [];
 
-    var nextButtonY = rowPaddedOrigins[1];
+    if (global_text) {
+        global_layout.t = {
+            x = columnPaddedOrigin[0],
+            y = rowPaddedOrigins[1],
+            w = ((cellPaddedDim + cellPadding) * 2) + (cellDim * 2),
+            h = cellPaddedDim,
+            // f: font
+            f: {
+                // s: size
+                s: cellPaddedDim / 8,
+            }
+        };
 
-    if (global_current_offer) {
-        nextButtonY = addGlobalButtonLayout('Accept', columnPaddedOrigin[3], nextButtonY);
-        nextButtonY = addGlobalButtonLayout('Counter', columnPaddedOrigin[3], nextButtonY);
+        var panePadding = global_layout.t.h / 10;
+
+        var lineCount = 5;
+        var vLineTextHeight = 10; // 10 virtual rows per line of text
+        var vLineGapHeight = 3; // 3 virtual rows per gap
+        var vLineRows = (lineCount * vLineTextHeight) + ((lineCount - 1) * vLineGapHeight);
+        var vLineHeight = (global_layout.t.h - (2 * panePadding)) / vLineRows;
+
+        var lineY = [];
+        var lineTextHeight = vLineHeight * vLineTextHeight;
+
+        for (var i = 0; i < lineCount; i++) {
+            lineY.push(global_layout.t.y + panePadding + (i * (lineTextHeight + (vLineHeight * vLineGapHeight))));
+        }
+
+        var nextLineYIndex = 0;
+
+        // lx: each line's X;
+        global_layout.t.lx = global_layout.t.x + panePadding;
+
+        global_layout.t.l = []
+
+        var maxChars = 50;
+        var words = global_text.t.split(' ');
+        var line = {
+            t: "",
+            y: lineY[nextLineYIndex++],
+        };
+
+        words.forEach(word => {
+            if (line.t.length + word.length > maxChars) {
+                if (line) global_layout.t.l.push(line);
+                line = {
+                    t: "",
+                    y: lineY[nextLineYIndex++],
+                }
+            }
+            line.t += word + " ";
+        })
+        global_layout.t.l.push(line);
+
+        global_layout.t.o = [];
+
+        var nextOptionX = global_layout.t.lx;
+
+        var optionY = lineY[lineY.length - 1];
+
+        var optionWidth = global_layout.t.w / 4.5;
+        var optionGap = global_layout.t.w / 60;
+
+        global_text.o.forEach(option => {
+            global_layout.t.o.push({
+                x: nextOptionX,
+                y: optionY,
+                w: optionWidth,
+                h: lineTextHeight,
+                t: option,
+                // s: selected
+                s: 0,
+            });
+            nextOptionX += optionWidth + optionGap;
+        });
+    } else {
+        global_layout.t = null;
     }
 };
+
+var global_text = {
+    t: "Backstory goes here. First to restore FILE 0 wins!",
+    o: ['Start'],
+}
 
 var addGlobalButtonLayout = (t, x, y) => {
     var height = global_layout.cpd / 5;
@@ -122,7 +199,9 @@ var addGlobalButtonLayout = (t, x, y) => {
 };
 
 var getCalculatedFilesLayout = (forPlayer, x, y, w) => {
-    var files = forPlayer ? player.f : opponent.f, nextY = y;
+    var sailor = forPlayer ? player : opponent;
+    if (!sailor) return [];
+    var files = sailor.f, nextY = y;
     return files.map(fi => {
         var fileLayout = getCalculatedFileLayout(forPlayer, fi, x, nextY, w);
         nextY += fileLayout.h * 2;
@@ -203,12 +282,8 @@ var getCalculatedFileLayout = (forPlayer, file, x, y, w) => {
 };
 
 var drawFiles = (forPlayer, w) => {
-    var files = forPlayer ? player.f : opponent.f;
     var layout = forPlayer ? global_layout.p : global_layout.o;
-
-    for (var i = 0; i < files.length; i++) {
-        drawFile(layout[i], w);
-    }
+    layout.forEach(fileLayout => drawFile(fileLayout, w))
 }
 
 var drawFile = (layout, w) => {
@@ -290,11 +365,13 @@ var draw = () => {
     // ctx.fillText(`${w} x ${h}`, 0, 0);
 
     if (player) {
+        // console.log('Drawing player...');
         drawSailor(player, global_layout.pa.x, global_layout.pa.y, global_layout.cpd, true);
         drawFiles(true, global_layout.cpd);
     }
 
     if (opponent) {
+        // console.log('Drawing opponent...');
         drawSailor(opponent, global_layout.oa.x, global_layout.oa.y, global_layout.cpd, false);
         drawFiles(false, global_layout.cpd);
     }
@@ -304,16 +381,27 @@ var draw = () => {
     ctx.textBaseline = "middle";
     ctx.fillStyle = '#000';
 
-    global_layout.b.forEach(b => {
-        ctx.strokeStyle = 'black';
-        ctx.strokeRect(b.x, b.y, global_layout.cpd, b.h);
-        ctx.fillStyle = b.s ? 'yellow' : 'grey';
-        ctx.fillRect(b.x, b.y, global_layout.cpd, b.h);
+    if (global_layout.t) {
         ctx.fillStyle = 'black';
-        ctx.fillText(b.t, b.x + (global_layout.cpd / 2), b.y + (b.h / 2), b.w, b.h);
-    })
+        ctx.fillRect(global_layout.t.x, global_layout.t.y, global_layout.t.w, global_layout.t.h);
 
-    // setTimeout(() => requestAnimationFrame(draw), 1000 / 60);
+        ctx.font = 'bold ' + global_layout.t.f.s + 'px monospace';
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = 'white';
+
+        global_layout.t.l.forEach(line => {
+            ctx.fillText(line.t, global_layout.t.lx, line.y);
+        });
+
+        ctx.textAlign = "left";
+
+        global_layout.t.o.forEach(option => {
+            ctx.fillStyle = option.s ? 'yellow' : 'white';
+            ctx.fillText('[ ' + option.t + ' ]', option.x, option.y);
+        });
+    }
+
     requestAnimationFrame(draw);
 };
 
@@ -507,13 +595,13 @@ var drawRectangle = (cc, x, y, width, height, radius) => {
 
 var global_selected_chunk;
 
-var onClick = (e) => {
-    // console.debug('global_selection', global_selection);
+var global_last_mouse_x, global_last_mouse_y;
 
+var onClick = (e) => {
+    global_last_mouse_x = e.offsetX;
+    global_last_mouse_y = e.offsetY;
     if (global_mode == 1 && global_selected_chunk) {
-        console.debug('global_selected_chunk', global_selected_chunk);
         var file = global_selected_chunk.p;
-        console.log('file', file);
 
         var collection = global_selected_chunk.g ? global_current_offer.o : global_current_offer.p;
 
@@ -528,15 +616,30 @@ var onClick = (e) => {
             transaction.b -= global_selected_chunk.b;
         else
             transaction.b += global_selected_chunk.b;
-
-        recalcLayout();
     }
 
     if (global_selection) {
+        if (global_selection.t == 'Start') newGame();
         if (global_selection.t == 'Accept') acceptOffer();
         if (global_selection.t == 'Counter') startCounterOffer();
-    };
+        if (global_selection.t == 'Offer') considerOffer();
+        if (global_selection.t == 'Cancel') generateOffer();
+        if (global_selection.t == 'Next') newOpponent();
+    }
+
+    recalcLayout();
 };
+
+var global_after_next_draw;
+
+var considerOffer = () => {
+    global_text = {
+        t: "What an offer! Hello hello hello hello hello!",
+        o: [],
+    };
+    recalcLayout();
+};
+
 
 
 // 0: nothing
@@ -544,6 +647,12 @@ var onClick = (e) => {
 var global_mode = 0;
 
 var startCounterOffer = () => {
+    global_text = {
+        t: "Wow, that's kinda insulting. But okay. Click on the chunks to make me a better offer, if you can.",
+        o: ['Offer', 'Cancel'],
+    };
+
+
     global_mode = 1;
 
     global_current_offer = {
@@ -575,8 +684,6 @@ var makePartial = () => [4, 0].reduce((acc, shift) => {
 }, 0);
 
 var toBinary = (b) => b.toString(2).padStart(CHUNKS_PER_FILE, 0);
-
-var showBits = (p) => console.info(`(${p.toString().padStart(3, ' ')}) ${toBinary(p)}`);
 
 var player;
 var opponent;
@@ -760,8 +867,6 @@ var findLowValueTransaction = (fromSailor, toSailor, matchValue) => {
     return transactionsToOffer;
 };
 
-var logTransaction = t => console.debug(`> "${toBinary(t.b)}" of file (${t.i}) worth $${t.v}.`);
-
 var applyTransaction = (s, t) => {
     if (g = s.f.find(h => h.i == t.i)) g.b += t.b; else {
         s.f.push({
@@ -774,7 +879,6 @@ var applyTransaction = (s, t) => {
 };
 
 var MAX_FILE_B = 255;
-var global_winner;
 
 var acceptOffer = _ => {
     // Apply the opponent's transactions.
@@ -791,24 +895,27 @@ var acceptOffer = _ => {
     var opponentWon = getSailorFile(opponent, 0).b == MAX_FILE_B;
 
     if (playerWon && opponentWon) {
-        // TODO: Special descriptive ending.
-        global_winner = player;
-        console.warn(`You won! :)`);
-        // showSailor(player);
+        global_text = {
+            t: "A draw! How disappointing!",
+            o: ['Start'],
+        };
     } else if (playerWon) {
-        global_winner = player;
-        console.warn(`You won! :)`);
-        // showSailor(player);
+        global_text = {
+            t: "You won!",
+            o: ['Start'],
+        };
     }
     else if (opponentWon) {
-        global_winner = opponent;
-        console.warn(`${opponent.n} won! :(`);
-        // showSailor(opponent);
+        global_text = {
+            t: `${opponent.n} won. :(`,
+            o: ['Start'],
+        };
     }
     else {
-        // console.info(`${opponent.n} walks away with:`);
-        // showSailor(opponent);
-        newOpponent();
+        global_text = {
+            t: "A pleasure doing business!",
+            o: ['Next'],
+        };
     }
 
     recalcLayout();
@@ -838,6 +945,13 @@ var generateOffer = () => {
         p: lowTransactions
     };
 
+    global_text = {
+        t: "That's my offer. Do we have a deal?",
+        o: ['Accept', 'Counter'],
+    };
+
+    recalcLayout();
+
     // TODO: If the lowTransactions are < 80% of the highTransactions then the
     //       opponent should feel bad and recalcuate the highTransaction to no
     //       more than 80% over the lowTransaction.
@@ -848,18 +962,22 @@ var isInside = (x, y, cx, cy, cw, ch) => cx < x && x < cx + cw && cy < y && y < 
 var onMouseMove = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    var x = e.offsetX, y = e.offsetY, found;
+
+    global_last_mouse_x = e ? e.offsetX : global_last_mouse_x;
+    global_last_mouse_y = e ? e.offsetY : global_last_mouse_y;
+
+    var found;
 
     if (global_mode == 1) {
         global_layout.p.forEach(fileLayout => {
             fileLayout.c.forEach(chunk => {
-                if (chunk.h = isInside(x, y, chunk.x, chunk.y, fileLayout.cw, fileLayout.cw)) found = chunk;
+                if (chunk.h = isInside(global_last_mouse_x, global_last_mouse_y, chunk.x, chunk.y, fileLayout.cw, fileLayout.cw)) found = chunk;
             });
         });
 
         global_layout.o.forEach(fileLayout => {
             fileLayout.c.forEach(chunk => {
-                if (chunk.h = isInside(x, y, chunk.x, chunk.y, fileLayout.cw, fileLayout.cw)) found = chunk;
+                if (chunk.h = isInside(global_last_mouse_x, global_last_mouse_y, chunk.x, chunk.y, fileLayout.cw, fileLayout.cw)) found = chunk;
             });
         });
 
@@ -867,8 +985,8 @@ var onMouseMove = (e) => {
         found = 0;
     }
 
-    global_layout.b.forEach(button => {
-        if (button.s = isInside(x, y, button.x, button.y, button.w, button.h)) found = button;
+    global_layout.t.o.forEach(option => {
+        if (option.s = isInside(global_last_mouse_x, global_last_mouse_y, option.x, option.y, option.w, option.h)) found = option;
     });
 
     canvas.style.cursor = found ? 'pointer' : 'default';
@@ -881,6 +999,6 @@ window.addEventListener('resize', recalcLayout, true);
 window.addEventListener('orientationchange', recalcLayout, true);
 
 
-newGame();
+// newGame();
 recalcLayout();
 requestAnimationFrame(draw);
